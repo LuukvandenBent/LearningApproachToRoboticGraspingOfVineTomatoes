@@ -1,0 +1,12 @@
+matplotlib
+Pillow
+opencv-python
+tensorflow
+tensorflow_hub
+tensorflow_datasets
+imgaug
+pandas
+google-colab
+jupyterlab
+opencv-python
+pyrealsense2

@@ -18,12 +18,13 @@ from utils.util import plot_image, save_fig
 from utils.util import remove_blobs, bin2img, img2bin
 from sklearn.metrics.pairwise import euclidean_distances
 import matplotlib as mpl
+from PIL import Image
 
 NEW_PATH_COLOUR = [130, 50, 230]
 JUNC_COLOR = (100, 0, 200)
 END_COLOR = (200, 0, 0)
 
-def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, save=False, name="", pwd=""):
+def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, save=False, save_skeleton=True, name="", pwd=""):
     if settings is None:
         settings = settings.detect_peduncle()
 
@@ -43,14 +44,6 @@ def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, sa
     skeleton_img = skeletonize_img(peduncle_img)
     junc_coords, end_coords = get_node_coord(skeleton_img)
 
-    
-    # #TODO: remove
-    # ret, bw_img = cv2.threshold(peduncle_img, 127, 255, cv2.THRESH_BINARY)
-    # cv2.imshow("Peduncle_img", bw_img)
-    # ret, bw_img = cv2.threshold(skeleton_img, 127, 255, cv2.THRESH_BINARY)
-    # cv2.imshow("Skeleton_img", bw_img)
-
-
     if save:
         visualize_skeleton(bg_img, skeleton_img, coord_junc=junc_coords, coord_end=end_coords,
                            name=name + "_01", pwd=pwd)
@@ -60,21 +53,33 @@ def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, sa
 
     # update_image = True
     # while update_image:
-    skeleton_img, b_remove = threshold_branch_length(skeleton_img, branch_length_min_px)
+    skeleton_img_filtered, b_remove = threshold_branch_length(skeleton_img, branch_length_min_px)
     # update_image = b_remove.any()
-    junc_coords, end_coords = get_node_coord(skeleton_img)
+    junc_coords, end_coords = get_node_coord(skeleton_img_filtered)
 
-    # #TODO: remove
-    # ret, bw_img = cv2.threshold(skeleton_img, 127, 255, cv2.THRESH_BINARY)
-    # cv2.imshow("Skeleton_img_threshold", bw_img)
+    if save_skeleton:
+        __, bw_img1 = cv2.threshold(peduncle_img, 127, 255, cv2.THRESH_BINARY)
+        __, bw_img2 = cv2.threshold(skeleton_img, 127, 255, cv2.THRESH_BINARY)
+        __, bw_img3 = cv2.threshold(skeleton_img_filtered, 127, 255, cv2.THRESH_BINARY)
+        im_pil1 = Image.fromarray(bw_img1)
+        im_pil2 = Image.fromarray(bw_img2)
+        im_pil3 = Image.fromarray(bw_img3)
 
+        image_size = im_pil1.size
+        new_image = Image.new('RGB',(3*image_size[0], image_size[1]), (250,250,250))
+        new_image.paste(im_pil1,(0,0))
+        new_image.paste(im_pil2,(image_size[0],0))
+        new_image.paste(im_pil3,(2*image_size[0],0))
+
+        path = os.path.join(pwd, 'skeleton', name)
+        new_image.save(path)
 
     if save:
-        visualize_skeleton(bg_img.copy(), skeleton_img, coord_junc=junc_coords, coord_end=end_coords,
+        visualize_skeleton(bg_img.copy(), skeleton_img_filtered, coord_junc=junc_coords, coord_end=end_coords,
                            name=name + "_02", pwd=pwd)
     
 
-    graph, pixel_coordinates = skan.skeleton_to_csgraph(skeleton_img, unique_junctions=True)
+    graph, pixel_coordinates = skan.skeleton_to_csgraph(skeleton_img_filtered, unique_junctions=True)
     dist, pred = csgraph.shortest_path(graph, directed=False, return_predecessors=True)
 
     end_nodes = coords_to_nodes(pixel_coordinates, end_coords[:, [1, 0]])
@@ -82,9 +87,9 @@ def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, sa
 
     path, path_length_px, branch_data = find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=bg_img.copy(), do_animate=False)
 
-    branch_data = get_branch_center(branch_data, dist, pixel_coordinates, skeleton_img)
+    branch_data = get_branch_center(branch_data, dist, pixel_coordinates, skeleton_img_filtered)
 
-    path_img = path_mask(path, pixel_coordinates, skeleton_img.shape)
+    path_img = path_mask(path, pixel_coordinates, skeleton_img_filtered.shape)
     junc_coords = pixel_coordinates[get_ids_on_path(path, pixel_coordinates, junc_nodes)][:, [1, 0]]
     end_coords = pixel_coordinates[get_ids_on_path(path, pixel_coordinates, end_nodes)][:, [1, 0]]
 
@@ -104,13 +109,6 @@ def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, sa
     if save:
         visualize_skeleton(bg_img, path_img, coord_junc=junc_coords, branch_data=branch_data, coord_end=end_coords,
                            name=name + "_04", pwd=pwd)
-
-
-    # #TODO: remove
-    # ret, bw_img = cv2.threshold(path_img, 127, 255, cv2.THRESH_BINARY)
-    # cv2.imshow("Path_img", bw_img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
 
 
     return path_img, branch_data, junc_coords, end_coords

@@ -10,6 +10,7 @@ from turtle import back
 import cv2
 import numpy as np
 import os
+from PIL import Image
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -34,7 +35,7 @@ def k_means_hue(img_hue, n_clusters, centers=None):
     data = np.stack((np.cos(angle), np.sin(angle)), axis=1)
 
     if centers is not None:
-        labels = np.array(assign_labels(img_hue, centers)[:, 0], dtype=np.int32)
+        labels = np.array(assign_labels(img_hue, centers)[0], dtype=np.int32)
         flags = cv2.KMEANS_USE_INITIAL_LABELS  # + cv2.KMEANS_PP_CENTERS
     else:
         labels = None
@@ -180,24 +181,7 @@ def segment_truss(img_hue, img_a=None, img_sat=None, img_val=None, save="False",
     centers_prior = {'hue': centers_prior_hue, 'a': centers_prior_a}
     centers = {'hue': centers_prior['hue'].values(), 'a': centers_prior['a'].values()}
 
-    ###########TODO: remove
-    n = 3
-
-    centers_prior_hue = {'tomato': np.deg2rad(0),  # [rad]
-                         'peduncle': np.deg2rad(90)}  # [rad]
-    centers_prior_a = {'tomato': 1.0,
-                       'peduncle': 0.5}
-    centers_prior_s = {'tomato': 200,
-                       'peduncle': 200}
-    
-    centers_prior = {'hue': centers_prior_hue, 'a': centers_prior_a, 'sat': centers_prior_s}
-    centers = {'hue': centers_prior['hue'].values(), 'a': centers_prior['a'].values(), 'sat': centers_prior['sat'].values()}
-
-    print(f'centers_prior: {centers_prior}')
-    print(f'centers: {centers}')
-    #########################
-
-    if img_a is None:
+    if img_a is None or centers_prior_a is None:
         print('No img_a, so only hue values are considered')
         centers, labels = k_means_hue(img_hue, n, centers=centers)  # centers
     else:
@@ -212,45 +196,11 @@ def segment_truss(img_hue, img_a=None, img_sat=None, img_val=None, save="False",
 
         labels = assign_labels(img_hue, centers, hue_radius=my_settings['hue_radius'], img_a=img_a, img_sat=img_sat)
 
-    ###### TODO: uncomment
-    # # determine which center corresponds to which segment
-    # lbl = {}
-    # lbl["tomato"] = np.argmin(angular_difference(centers['hue'], centers_prior['hue']['tomato']))
-    # lbl["background"] = np.argmin(angular_difference(centers['hue'], centers_prior['hue']['background']))
-    # lbl["peduncle"] = list(set(range(0, n)) - set(lbl.values()))[0]
-    #####################
-
-    ####### TODO: remove
     # determine which center corresponds to which segment
     lbl = {}
     lbl["tomato"] = np.argmin(angular_difference(centers['hue'], centers_prior['hue']['tomato']))
+    lbl["background"] = np.argmin(angular_difference(centers['hue'], centers_prior['hue']['background']))
     lbl["peduncle"] = list(set(range(0, n)) - set(lbl.values()))[0]
-    
-    print(f'lbl: {lbl}')
-    count = 0
-    for i in range(len(labels)):
-        if labels[i] == 0:
-            count += 1
-    print(f'{count} times label 0')
-
-    count1 = 0
-    for i in range(len(labels)):
-        if labels[i] == 1:
-            count1 += 1
-    print(f'{count1} times label 1')
-    print(f'{count+count1} pixels in total')
-
-    # compute masks
-    dim = img_hue.shape
-    tomato = label2img(labels, lbl["tomato"], dim)
-    peduncle = label2img(labels, lbl["peduncle"], dim)
-    ret, bw_img = cv2.threshold(tomato, 127, 255, cv2.THRESH_BINARY)
-    cv2.imshow("tomato", bw_img)
-    ret, bw_img = cv2.threshold(peduncle, 127, 255, cv2.THRESH_BINARY)
-    cv2.imshow("peduncle", bw_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    #####################
 
     # compute masks
     dim = img_hue.shape
@@ -269,46 +219,45 @@ def segment_truss(img_hue, img_a=None, img_sat=None, img_val=None, save="False",
         if img_a is not None:
             a_hist(img_a_norm, centers['a'], lbl, bins=a_max - a_min + 1, name=name, pwd=pwd)
 
-    ########TODO: remove
-    print(f'lbl: {lbl}')
-    count = 0
-    for i in range(len(labels)):
-        if labels[i] == 1:
-            count += 1
-    print(f'{count} times label 1')
-
-    count = 0
-    for i in range(len(background)):
-        for j in range(len(background[i])):
-            if background[i][j] != 0:
-                count += 1
-    print(f'{count} pixels assigned to background')
-
-    count = 0
-    for i in range(len(tomato)):
-        for j in range(len(tomato[i])):
-            if tomato[i][j] != 0:
-                count += 1
-    print(f'{count} pixels assigned to tomato')
-
-    count = 0
-    for i in range(len(peduncle)):
-        for j in range(len(peduncle[i])):
-            if peduncle[i][j] != 0:
-                count += 1
-    print(f'{count} pixels assigned to peduncle')
-    # ret, bw_img = cv2.threshold(background, 127, 255, cv2.THRESH_BINARY)
-    # cv2.imshow("background", bw_img)
-    # ret, bw_img = cv2.threshold(tomato, 127, 255, cv2.THRESH_BINARY)
-    # cv2.imshow("tomato", bw_img)
-    # ret, bw_img = cv2.threshold(peduncle, 127, 255, cv2.THRESH_BINARY)
-    # cv2.imshow("peduncle", bw_img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    ########################
-
     return background, tomato, peduncle
 
+def segment_truss_2(img_hsv, img_rgb, pwd = None, name = None, save=True):
+
+    # remove background with low saturation values
+    lower_background = np.array([0,50,0])
+    upper_background = np.array([180,255,255])
+    background = cv2.inRange(img_hsv, lower_background, upper_background)
+    img_rgb_without_background = cv2.bitwise_and(img_rgb, img_rgb, mask=background)
+
+    # hsv image without background
+    img_hsv = cv2.cvtColor(img_rgb_without_background, cv2.COLOR_RGB2HSV)
+
+    # create green mask
+    lower_green = np.array([20,0,0])
+    upper_green = np.array([70,255,255])
+    peduncle = cv2.inRange(img_hsv, lower_green, upper_green)
+
+    # create red mask
+    # lower mask (0-10)
+    lower_red = np.array([0,0,0])
+    upper_red = np.array([10,255,255])
+    mask0 = cv2.inRange(img_hsv, lower_red, upper_red)
+
+    # upper mask (170-180)
+    lower_red = np.array([170,0,0])
+    upper_red = np.array([180,255,255])
+    mask1 = cv2.inRange(img_hsv, lower_red, upper_red)
+
+    tomato = mask0 + mask1
+
+    if save:
+        img_peduncle = cv2.bitwise_and(img_rgb, img_rgb, mask=peduncle)
+        path = os.path.join(pwd + '/06_peduncle', name)
+        image = Image.fromarray(img_peduncle.astype('uint8')).convert('RGB')
+        image.save(path)
+
+
+    return background, tomato, peduncle
 
 def hue_hist(img_hue, centers, lbl, name, pwd):
     # [-180, 180] => [0, 360]

@@ -322,7 +322,7 @@ def plot_segments(img_rgb, background, tomato, peduncle, fig=None, show_backgrou
         plt.title(title)
 
     if pwd is not None:
-        save_fig(fig, pwd, name, title=title)
+        save_fig(fig, pwd, name)
 
     return fig
 

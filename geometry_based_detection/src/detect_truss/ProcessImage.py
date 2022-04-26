@@ -13,7 +13,7 @@ from pathlib import Path
 from filter_segments import filter_segments
 from detect_peduncle_2 import detect_peduncle, visualize_skeleton
 from detect_tomato import detect_tomato
-from segment_image import segment_truss
+from segment_image import segment_truss, segment_truss_2
 import settings
 
 sys.path.append("../")
@@ -87,6 +87,7 @@ class ProcessImage(object):
         pwd = os.path.join(self.pwd, '01_color_space')
         self.img_hue = cv2.cvtColor(self.img_rgb, cv2.COLOR_RGB2HSV)[:, :, 0]
         ########TODO: remove
+        self.img_hsv = cv2.cvtColor(self.img_rgb, cv2.COLOR_RGB2HSV)
         self.img_sat = cv2.cvtColor(self.img_rgb, cv2.COLOR_RGB2HSV)[:, :, 1]
         self.img_val = cv2.cvtColor(self.img_rgb, cv2.COLOR_RGB2HSV)[:, :, 2]
         ########
@@ -114,14 +115,17 @@ class ProcessImage(object):
             self.settings['segment_image']['hue_radius'] = radius
 
         success = True
-        background, tomato, peduncle = segment_truss(self.img_hue,
-                                                     img_a=self.img_a,
-                                                     img_sat = self.img_sat,
-                                                     img_val = self.img_val,
-                                                     my_settings=self.settings['segment_image'],
-                                                     save=self.save,
-                                                     pwd=pwd,
-                                                     name=self.name)
+        # background, tomato, peduncle = segment_truss(self.img_hue,
+        #                                              img_a=self.img_a,
+        #                                              img_sat = self.img_sat,
+        #                                              img_val = self.img_val,
+        #                                              my_settings=self.settings['segment_image'],
+        #                                              save=self.save,
+        #                                              pwd=pwd,
+        #                                              name=self.name)
+
+        background, tomato, peduncle = segment_truss_2(self.img_hsv, self.img_rgb, pwd=self.pwd, name=self.name)     
+
 
         self.background = background
         self.tomato = tomato
@@ -490,21 +494,8 @@ class ProcessImage(object):
         xy_peduncle = coords_from_points(self.peduncle_points, frame_id)
         rc_peduncle = np.around(np.array(xy_peduncle)).astype(int)[:,(1, 0)]
 
-        #TODO: remove
-        # print(f'img shape: {img.shape[:2]}')
-        # print(f'shape: {shape}')
-
         img_shape = img.shape[:2]
-        if (shape[1] > shape[0]) and (img_shape[0] > img_shape[1]) or (shape[0] > shape[1]) and (img_shape[1] > img_shape[0]):
-            shape = (shape[1],shape[0])
-        
-        #TODO: remove
-        # print(f'shape: {shape}')
-        # print(f'rc_peduncle shape: {rc_peduncle.shape}')
-        # print(rc_peduncle[:, 0])
-        # print(rc_peduncle[:, 1])
-        # print(max(shape))
-        shape = (max(shape),max(shape))
+        shape = (max(img_shape),max(img_shape))
 
         arr = np.zeros(shape, dtype=np.uint8)
         arr[rc_peduncle[:, 0], rc_peduncle[:, 1]] = 1 
@@ -656,7 +647,7 @@ def main():
     i_end = len(images) + 1
     N = len(images)
 
-    for count, i_tomato in enumerate(images[1:2]):
+    for count, i_tomato in enumerate(images[0:10]):
         print("Analyzing image ID %d (%d/%d)" % (count + 1, count + 1, N))
 
         tomato_name = i_tomato
@@ -676,7 +667,7 @@ def main():
         with open(pwd_json_file, "w") as write_file:
             json.dump(json_data, write_file)
 
-    if True:  # save is not True:
+    if save is True:  # save is not True:
         plot_timer(Timer.timers['main'].copy(), threshold=0.02, pwd=pwd_results, name='main', title='Processing time',
                    startangle=-20)
 

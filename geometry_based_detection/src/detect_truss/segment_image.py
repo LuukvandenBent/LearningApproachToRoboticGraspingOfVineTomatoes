@@ -233,18 +233,18 @@ def segment_truss_2(img_hsv, img_rgb, pwd = None, name = None, save=True):
     img_hsv = cv2.cvtColor(img_rgb_without_background, cv2.COLOR_RGB2HSV)
 
     # create green mask
-    lower_green = np.array([20,0,0])
+    lower_green = np.array([20,50,0])
     upper_green = np.array([70,255,255])
     peduncle = cv2.inRange(img_hsv, lower_green, upper_green)
 
     # create red mask
-    # lower mask (0-10)
-    lower_red = np.array([0,0,0])
-    upper_red = np.array([10,255,255])
+    # lower mask 
+    lower_red = np.array([0,50,0])
+    upper_red = np.array([20,255,255])
     mask0 = cv2.inRange(img_hsv, lower_red, upper_red)
 
-    # upper mask (170-180)
-    lower_red = np.array([170,0,0])
+    # upper mask
+    lower_red = np.array([160,50,0])
     upper_red = np.array([180,255,255])
     mask1 = cv2.inRange(img_hsv, lower_red, upper_red)
 

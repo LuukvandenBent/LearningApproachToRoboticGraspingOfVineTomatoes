@@ -7,6 +7,9 @@
 ## imports ##
 import cv2
 import numpy as np
+import os
+
+from PIL import Image
 
 # custom functions
 from utils.util import plot_features
@@ -21,13 +24,19 @@ def compute_com(centers, radii):
 
 
 def detect_tomato(img_segment, settings=None, px_per_mm=None, img_rgb=None,
-                  save=False, pwd="", name=""):
+                  save=False, pwd="", name="", save_tomato=False):
 
     if img_rgb is None:
         img_rgb = img_segment
 
     if settings is None:
         settings = settings.detect_tomato()
+
+    if save_tomato:
+        __, bw_img = cv2.threshold(img_segment, 127, 255, cv2.THRESH_BINARY)
+        im_pil = Image.fromarray(bw_img)
+        path = os.path.join(pwd, name)
+        im_pil.save(path)
 
     # set dimensions
     if px_per_mm:
@@ -36,8 +45,8 @@ def detect_tomato(img_segment, settings=None, px_per_mm=None, img_rgb=None,
         distance_min_px = radius_min_px * 2
     else:
         dim = img_segment.shape
-        radius_min_px = dim[1] / settings['radius_min_frac']
-        radius_max_px = dim[1] / settings['radius_max_frac']
+        radius_min_px = int(round(dim[1] / settings['radius_min_frac']))
+        radius_max_px = int(round(dim[1] / settings['radius_max_frac']))
         distance_min_px = radius_min_px * 2
 
     # Hough requires a gradient, thus the image is blurred

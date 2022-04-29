@@ -9,6 +9,8 @@ import json
 from matplotlib import pyplot as plt
 import sys
 from pathlib import Path
+from PIL import Image
+
 
 from filter_segments import filter_segments
 from detect_peduncle_2 import detect_peduncle, visualize_skeleton
@@ -101,7 +103,7 @@ class ProcessImage(object):
             save_img(self.img_a, pwd, self.name + '_a', color_map='Lab')
 
     @Timer("segmentation", name_space)
-    def segment_image(self, radius=None):
+    def segment_image(self, radius=None, save_segment=False):
         """segment image based on hue and a color components.
 
         Keyword arguments:
@@ -126,6 +128,20 @@ class ProcessImage(object):
 
         background, tomato, peduncle = segment_truss_2(self.img_hsv, self.img_rgb, pwd=self.pwd, name=self.name)     
 
+        if save_segment:
+            images = [background, tomato, peduncle]
+
+            for i, image in enumerate(images):
+                __, bw_img = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+                im_pil = Image.fromarray(bw_img)
+
+                if i == 0:
+                    image_size = im_pil.size
+                    new_image = Image.new('RGB',(len(images)*image_size[0], image_size[1]), (250,250,250))
+
+                new_image.paste(im_pil,(image_size[0]*i,0))
+            path = os.path.join(self.pwd, '02_segment', self.name)
+            new_image.save(path)
 
         self.background = background
         self.tomato = tomato
@@ -219,7 +235,7 @@ class ProcessImage(object):
         """detect tomatoes based on the truss segment"""
         pwd = os.path.join(self.pwd, '05_tomatoes')
 
-        if self.truss_crop.sum() == 0:
+        if self.tomato_crop.sum() == 0:
             warnings.warn("Detect tomato: no pixel has been classified as truss!")
             return False
 
@@ -228,13 +244,14 @@ class ProcessImage(object):
         else:
             img_bg = self.img_rgb_crop
 
-        centers, radii, com = detect_tomato(self.truss_crop,
+        centers, radii, com = detect_tomato(self.tomato_crop,
                                             self.settings['detect_tomato'],
-                                            px_per_mm=self.px_per_mm,
+                                            # px_per_mm=self.px_per_mm,
                                             img_rgb=img_bg,
                                             save=self.save,
                                             pwd=pwd,
-                                            name=self.name)
+                                            name=self.name,
+                                            save_tomato=True)
 
         # convert obtained coordinated to two-dimensional points linked to a coordinate frame
         self.radii = radii
@@ -467,7 +484,7 @@ class ProcessImage(object):
         else:
             return self.img_rgb
 
-    def get_truss_visualization(self, local=False, save=False):
+    def get_truss_visualization(self, local=False, save=False, show_grasp_area=False):
         pwd = os.path.join(self.pwd, '08_result')
 
         if local:
@@ -504,8 +521,10 @@ class ProcessImage(object):
         plt.figure()
         plot_image(img)
         plot_features(tomato=tomato, zoom=zoom)
-        visualize_skeleton(img, arr, coord_junc=xy_junc, show_img=False, skeleton_width=skeleton_width)
-
+        grasp = visualize_skeleton(img, arr, coord_junc=xy_junc, show_img=False, skeleton_width=skeleton_width, 
+                            show_grasp_area=show_grasp_area,tomato=tomato)
+        
+        print('grasp:',grasp)
         if (grasp["xy"] is not None) and (grasp["angle"] is not None):
             settings = self.settings['compute_grasp']
             if self.px_per_mm is not None:
@@ -564,7 +583,7 @@ class ProcessImage(object):
 
         self.color_space()
 
-        success = self.segment_image()
+        success = self.segment_image(save_segment=True)
         if success is False:
             print("Failed to segment image")
             return success
@@ -617,7 +636,7 @@ def load_px_per_mm(pwd, img_id):
     with open(pwd_info, "r") as read_file:
         data_inf = json.load(read_file)
 
-    return data_inf['px_per_mm']*1.67 #TODO: remove *1.67
+    return data_inf['px_per_mm']*1.67*1.8 #TODO: remove *1.67
 
 
 def main():
@@ -647,7 +666,7 @@ def main():
     i_end = len(images) + 1
     N = len(images)
 
-    for count, i_tomato in enumerate(images[0:10]):
+    for count, i_tomato in enumerate(images[10:11]):
         print("Analyzing image ID %d (%d/%d)" % (count + 1, count + 1, N))
 
         tomato_name = i_tomato
@@ -658,8 +677,8 @@ def main():
         process_image.add_image(rgb_data, px_per_mm=px_per_mm, name=tomato_name)
 
         success = process_image.process_image()
-        process_image.get_truss_visualization(local=True, save=True)
-        process_image.get_truss_visualization(local=False, save=True)
+        process_image.get_truss_visualization(local=True, save=True, show_grasp_area=True)
+        process_image.get_truss_visualization(local=False, save=True, show_grasp_area=True)
 
         json_data = process_image.get_object_features()
 

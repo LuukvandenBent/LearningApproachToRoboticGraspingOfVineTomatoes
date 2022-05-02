@@ -9,11 +9,10 @@ import json
 from matplotlib import pyplot as plt
 import sys
 from pathlib import Path
-from PIL import Image
 
 
 from filter_segments import filter_segments
-from detect_peduncle_2 import detect_peduncle, visualize_skeleton
+from detect_peduncle_2 import detect_peduncle, visualize_skeleton, get_node_coord
 from detect_tomato import detect_tomato
 from segment_image import segment_truss, segment_truss_2
 import settings
@@ -26,7 +25,7 @@ from utils.timer import Timer
 
 from utils.util import make_dirs, load_rgb, save_img, save_fig, figure_to_image
 from utils.util import stack_segments, change_brightness
-from utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
+from utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments, save_images
 
 warnings.filterwarnings('error', category=FutureWarning)
 
@@ -130,18 +129,8 @@ class ProcessImage(object):
 
         if save_segment:
             images = [background, tomato, peduncle]
-
-            for i, image in enumerate(images):
-                __, bw_img = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
-                im_pil = Image.fromarray(bw_img)
-
-                if i == 0:
-                    image_size = im_pil.size
-                    new_image = Image.new('RGB',(len(images)*image_size[0], image_size[1]), (250,250,250))
-
-                new_image.paste(im_pil,(image_size[0]*i,0))
-            path = os.path.join(self.pwd, '02_segment', self.name)
-            new_image.save(path)
+            path = os.path.join(self.pwd, '02_segment')
+            save_images(images, path, self.name)
 
         self.background = background
         self.tomato = tomato
@@ -515,16 +504,20 @@ class ProcessImage(object):
         shape = (max(img_shape),max(img_shape))
 
         arr = np.zeros(shape, dtype=np.uint8)
-        arr[rc_peduncle[:, 0], rc_peduncle[:, 1]] = 1 
+        arr[rc_peduncle[:, 0], rc_peduncle[:, 1]] = 1
+
+        if show_grasp_area:
+            grasp, grasp_img, grasp_points = self.find_grasp_points(skeleton_img=arr, tomato=tomato) 
+        else:
+            grasp_img = grasp_points = None
 
         # plot
         plt.figure()
         plot_image(img)
         plot_features(tomato=tomato, zoom=zoom)
-        grasp = visualize_skeleton(img, arr, coord_junc=xy_junc, show_img=False, skeleton_width=skeleton_width, 
-                            show_grasp_area=show_grasp_area,tomato=tomato)
+        visualize_skeleton(img, arr, coord_junc=xy_junc, show_img=False, skeleton_width=skeleton_width, 
+                            show_grasp_area=show_grasp_area,grasp=grasp,grasp_img=grasp_img,grasp_points=grasp_points)
         
-        print('grasp:',grasp)
         if (grasp["xy"] is not None) and (grasp["angle"] is not None):
             settings = self.settings['compute_grasp']
             if self.px_per_mm is not None:
@@ -573,6 +566,75 @@ class ProcessImage(object):
         tomato, peduncle, background = self.get_segments(local=local)
         img_rgb = self.get_rgb(local=local)
         plot_segments(img_rgb, background, tomato, peduncle, linewidth=0.5, pwd=pwd, name=name, alpha=1)
+    
+    def find_grasp_points(self, skeleton_img, tomato):
+        grasp_img = skeleton_img.copy()
+        coord_junc, coord_end = get_node_coord(skeleton_img)
+        all_coords = np.vstack((coord_junc,coord_end))
+
+        for coord in all_coords:
+            coord = coord.astype(int)
+
+            radius = int(np.mean(grasp_img.shape) * 0.02)
+            area_x = np.arange(coord[1]-radius,coord[1]+radius)
+            area_y = np.arange(coord[0]-radius,coord[0]+radius)
+            for i in range(len(area_x)):
+                for j in range(len(area_y)):
+                    grasp_img[area_x[i]][area_y[j]] = 0
+        
+        # find possible grasp points
+        mask = []
+        for i in range(len(grasp_img)):
+            for j in range(len(grasp_img[i])):
+                if grasp_img[i][j] == 1:
+                    mask.append([i,j])
+        
+        subpath = [mask[0]]
+        grasp_points = []
+        angles = []
+        for i in range(len(mask)-1):
+            current_coord = mask[i]
+            next_coord = mask[i+1]
+            dist = np.sqrt((current_coord[0]-next_coord[0])**2 + (current_coord[1]-next_coord[1])**2)
+
+            if dist < 10:
+                subpath.append(next_coord)
+            else:
+                index = int(len(subpath)/2)
+                grasp_point = subpath[index]
+                grasp_point = [grasp_point[1], grasp_point[0]]
+                grasp_points.append(grasp_point)
+
+                start_node = subpath[0]
+                end_node = subpath[-1]
+                dx = end_node[1] - start_node[1]
+                dy = end_node[0] - start_node[0]
+                angle = np.arctan(dy/(dx+0.001))
+                angles.append(angle)
+                
+                subpath = [next_coord]
+        
+        # mark grasp point closest to COM
+        if tomato is not None:
+            com_xy = tomato['com']
+
+            shortest_dist = np.Inf
+            for i in range(len(grasp_points)):
+                grasp_point = grasp_points[i]
+                dist = np.sqrt((com_xy[0]-grasp_point[0])**2 + (com_xy[1]-grasp_point[1])**2)
+
+                if dist < shortest_dist:
+                    shortest_dist = dist
+                    i_shortest = i
+            
+            grasp_pixel = np.around(grasp_points[i_shortest]).astype(int)
+            row = grasp_pixel[1]
+            col = grasp_pixel[0]
+            angle = angles[i_shortest]
+
+            grasp_location = {"xy": grasp_pixel, "row": int(row), "col": int(col), "angle": angle}
+
+            return grasp_location, grasp_img, grasp_points 
 
     @Timer("process image")
     def process_image(self):
@@ -678,7 +740,7 @@ def main():
 
         success = process_image.process_image()
         process_image.get_truss_visualization(local=True, save=True, show_grasp_area=True)
-        process_image.get_truss_visualization(local=False, save=True, show_grasp_area=True)
+        process_image.get_truss_visualization(local=False, save=True, show_grasp_area=False)
 
         json_data = process_image.get_object_features()
 

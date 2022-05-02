@@ -12,7 +12,7 @@ import os
 from PIL import Image
 
 # custom functions
-from utils.util import plot_features
+from utils.util import plot_features, save_images
 
 def compute_com(centers, radii):
     """
@@ -33,10 +33,8 @@ def detect_tomato(img_segment, settings=None, px_per_mm=None, img_rgb=None,
         settings = settings.detect_tomato()
 
     if save_tomato:
-        __, bw_img = cv2.threshold(img_segment, 127, 255, cv2.THRESH_BINARY)
-        im_pil = Image.fromarray(bw_img)
-        path = os.path.join(pwd, name)
-        im_pil.save(path)
+        images = [img_segment]
+        save_images(images, pwd, name)
 
     # set dimensions
     if px_per_mm:

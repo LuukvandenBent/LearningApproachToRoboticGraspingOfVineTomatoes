@@ -25,6 +25,7 @@ from utils.util import save_fig
 from utils.util import angular_difference
 from utils.util import plot_segments
 from utils.util import grey_2_rgb
+from utils.util import save_images
 
 final_image_id = '015' # used for plotting
 LINEWIDTH = 3.4  # inch
@@ -252,10 +253,8 @@ def segment_truss_2(img_hsv, img_rgb, pwd = None, name = None, save=True):
 
     if save:
         img_peduncle = cv2.bitwise_and(img_rgb, img_rgb, mask=peduncle)
-        path = os.path.join(pwd + '/06_peduncle', name)
-        image = Image.fromarray(img_peduncle.astype('uint8')).convert('RGB')
-        image.save(path)
-
+        path = os.path.join(pwd + '/06_peduncle')
+        save_images(img_peduncle, path, name, RGB=True)
 
     return background, tomato, peduncle
 

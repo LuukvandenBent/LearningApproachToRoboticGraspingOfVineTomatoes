@@ -15,7 +15,7 @@ from sklearn import linear_model
 
 from utils.util import add_circles, add_arrows, add_contour, add_strings
 from utils.util import plot_image, save_fig
-from utils.util import remove_blobs, bin2img, img2bin
+from utils.util import remove_blobs, bin2img, img2bin, save_images
 from sklearn.metrics.pairwise import euclidean_distances
 import matplotlib as mpl
 from PIL import Image
@@ -94,20 +94,9 @@ def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, sa
                            name=name + "_04", pwd=pwd)
 
     if save_skeleton:
+        path = os.path.join(pwd, 'skeleton')
         images = [peduncle_img, skeleton_img, skeleton_img_filtered, path_img]
-
-        for i, image in enumerate(images):
-            __, bw_img = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
-            im_pil = Image.fromarray(bw_img)
-
-            if i == 0:
-                image_size = im_pil.size
-                new_image = Image.new('RGB',(len(images)*image_size[0], image_size[1]), (250,250,250))
-
-            new_image.paste(im_pil,(image_size[0]*i,0))
-
-        path = os.path.join(pwd, 'skeleton', name)
-        new_image.save(path)
+        save_images(images, path, name)
 
     return path_img, branch_data, junc_coords, end_coords
 
@@ -376,7 +365,7 @@ def path_mask(path, pixel_coordinates, shape):
 
 def visualize_skeleton(img, skeleton_img, skeletonize=False, coord_junc=None, coord_end=None, junc_nodes=None,
                        end_nodes=None, branch_data=None, name="", pwd=None, show_nodes=True, skeleton_color=None,
-                       skeleton_width=4, show_img=True, show_grasp_area=False,tomato=None,grasp_location=None):
+                       skeleton_width=4, show_img=True, show_grasp_area=False,grasp=None,grasp_img=None,grasp_points=None):
 
     if skeleton_color is None:
         skeleton_color = (0, 150, 30)
@@ -392,80 +381,22 @@ def visualize_skeleton(img, skeleton_img, skeletonize=False, coord_junc=None, co
 
     add_contour(skeleton_img, skeleton_color, linewidth=skeleton_width, zorder=6)
 
+    count = 0
+    for i in range(len(skeleton_img)):
+        for j in range(len(skeleton_img[i])):
+            if skeleton_img[i][j] == 1:
+                count += 1
+    print(f'{count} pixels in skeleton_img are 1')
+
     if show_grasp_area:
         grasp_area_color = (250, 120, 0)
-        grasp_img = skeleton_img
-        coord_junc, coord_end = get_node_coord(skeleton_img)
-        all_coords = np.vstack((coord_junc,coord_end))
-
-        for coord in all_coords:
-            coord = coord.astype(int)
-
-            radius = int(np.mean(grasp_img.shape) * 0.02)
-            area_x = np.arange(coord[1]-radius,coord[1]+radius)
-            area_y = np.arange(coord[0]-radius,coord[0]+radius)
-            for i in range(len(area_x)):
-                for j in range(len(area_y)):
-                    grasp_img[area_x[i]][area_y[j]] = 0
-
         add_contour(grasp_img, grasp_area_color, linewidth=0.5*skeleton_width, zorder=6)
-        
-        # find possible grasp points
-        mask = []
-        for i in range(len(grasp_img)):
-            for j in range(len(grasp_img[i])):
-                if grasp_img[i][j] == 1:
-                    mask.append([i,j])
-        
-        subpath = [mask[0]]
-        grasp_points = []
-        angles = []
-        for i in range(len(mask)-1):
-            current_coord = mask[i]
-            next_coord = mask[i+1]
-            dist = np.sqrt((current_coord[0]-next_coord[0])**2 + (current_coord[1]-next_coord[1])**2)
-
-            if dist < 10:
-                subpath.append(next_coord)
-            else:
-                index = int(len(subpath)/2)
-                grasp_point = subpath[index]
-                grasp_point = [grasp_point[1], grasp_point[0]]
-                grasp_points.append(grasp_point)
-
-                start_node = subpath[0]
-                end_node = subpath[-1]
-                dx = end_node[1] - start_node[1]
-                dy = end_node[0] - start_node[0]
-                angle = np.arctan(dy/(dx+0.001))
-                angles.append(angle)
-                
-                subpath = [next_coord]
         
         if len(grasp_points) > 0:
             add_circles(grasp_points, radii=10, fc=grasp_area_color, linewidth=0, zorder=7)
 
-        # mark grasp point closest to COM
-        if tomato is not None:
-            com_xy = tomato['com']
-
-            shortest_dist = np.Inf
-            for i in range(len(grasp_points)):
-                grasp_point = grasp_points[i]
-                dist = np.sqrt((com_xy[0]-grasp_point[0])**2 + (com_xy[1]-grasp_point[1])**2)
-
-                if dist < shortest_dist:
-                    shortest_dist = dist
-                    i_shortest = i
-            
-            grasp_pixel = np.around(grasp_points[i_shortest]).astype(int)
-            row = grasp_pixel[1]
-            col = grasp_pixel[0]
-            angle = angles[i_shortest]
-
-            grasp_location = {"xy": grasp_pixel, "row": int(row), "col": int(col), "angle": angle}
-
-            add_circles(grasp_pixel, radii=12, fc=(0,0,255), linewidth=0, zorder=7)
+        if grasp is not None:
+            add_circles(grasp['xy'], radii=12, fc=(0,0,255), linewidth=0, zorder=7)
             
     if (len(np.argwhere(skeleton_img)) > 2) and show_nodes:
 
@@ -502,8 +433,6 @@ def visualize_skeleton(img, skeleton_img, skeletonize=False, coord_junc=None, co
 
     if pwd:
         save_fig(fig, pwd, name)
-
-    return grasp_location
 
 def fit_ransac(peduncle_img, bg_img=None, save=False, name="", pwd=""):
     pend_color = np.array([0, 150, 30])

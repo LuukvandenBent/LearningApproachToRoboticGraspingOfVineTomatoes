@@ -12,6 +12,7 @@ import warnings
 import copy
 from matplotlib import pyplot as plt
 import matplotlib as mpl
+from PIL import Image
 
 from utils import color_maps
 import matplotlib.gridspec as gridspec
@@ -939,3 +940,22 @@ def figure_to_image(fig):
     # Option 2a: Convert to a NumPy array.
     img = np.fromstring(s, np.uint8).reshape((height, width, 4))
     return img
+
+def save_images(images, path, name, RGB=False):
+    
+    path = os.path.join(path, name)
+
+    if RGB:
+        image = Image.fromarray(images.astype('uint8')).convert('RGB')
+        image.save(path)
+    else:
+        for i, image in enumerate(images):
+            __, bw_img = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+            im_pil = Image.fromarray(bw_img)
+
+            if i == 0:
+                image_size = im_pil.size
+                new_image = Image.new('RGB',(len(images)*image_size[0], image_size[1]), (250,250,250))
+
+            new_image.paste(im_pil,(image_size[0]*i,0))
+        new_image.save(path)

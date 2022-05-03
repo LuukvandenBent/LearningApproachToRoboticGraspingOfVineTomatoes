@@ -381,22 +381,15 @@ def visualize_skeleton(img, skeleton_img, skeletonize=False, coord_junc=None, co
 
     add_contour(skeleton_img, skeleton_color, linewidth=skeleton_width, zorder=6)
 
-    count = 0
-    for i in range(len(skeleton_img)):
-        for j in range(len(skeleton_img[i])):
-            if skeleton_img[i][j] == 1:
-                count += 1
-    print(f'{count} pixels in skeleton_img are 1')
-
     if show_grasp_area:
         grasp_area_color = (250, 120, 0)
         add_contour(grasp_img, grasp_area_color, linewidth=0.5*skeleton_width, zorder=6)
         
         if len(grasp_points) > 0:
-            add_circles(grasp_points, radii=10, fc=grasp_area_color, linewidth=0, zorder=7)
-
-        if grasp is not None:
-            add_circles(grasp['xy'], radii=12, fc=(0,0,255), linewidth=0, zorder=7)
+            add_circles(grasp_points, radii=6, fc=grasp_area_color, linewidth=0, zorder=7)
+    
+    if grasp is not None:
+        add_circles(grasp['xy'], radii=8, fc=(0,0,255), linewidth=0, zorder=7)
             
     if (len(np.argwhere(skeleton_img)) > 2) and show_nodes:
 

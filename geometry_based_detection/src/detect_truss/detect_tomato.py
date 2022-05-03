@@ -81,7 +81,7 @@ def detect_tomato(img_segment, settings=None, px_per_mm=None, img_rgb=None,
 
         n = len(i_keep)
         if n != n_overlap:
-            print('removed', n_overlap - n, 'tomaoto(es) based on overlap')
+            print('removed', n_overlap - n, 'tomato(es) based on overlap')
 
         if len(i_keep) != 0:
             centers = centers_overlap[i_keep, :]

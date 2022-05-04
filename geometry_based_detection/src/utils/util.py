@@ -959,3 +959,125 @@ def save_images(images, path, name, RGB=False):
 
             new_image.paste(im_pil,(image_size[0]*i,0))
         new_image.save(path)
+
+def calculate_grasp_point_and_angle(subpath):
+    index = int(len(subpath)/2)
+    grasp_coord = subpath[index]
+    grasp_coord = [grasp_coord[1], grasp_coord[0]]
+
+    start_node = subpath[0]
+    end_node = subpath[-1]
+    dx = end_node[1] - start_node[1]
+    dy = end_node[0] - start_node[0]
+    angle = np.arctan(dy/(dx+0.001))
+
+    return grasp_coord, angle
+
+def find_grasp_coords_and_angles(grasp_img):
+    """Find possible grasp points and angles"""
+
+    mask = []
+    for i in range(len(grasp_img)):
+        for j in range(len(grasp_img[i])):
+            if grasp_img[i][j] == 1:
+                mask.append([i,j])
+    
+    subpath = [mask[0]]
+    grasp_coords = []
+    angles = []
+    for i in range(len(mask)-1):
+        current_coord = mask[i]
+        next_coord = mask[i+1]
+        dist = np.sqrt((current_coord[0]-next_coord[0])**2 + (current_coord[1]-next_coord[1])**2)
+
+        if dist < 10:
+            subpath.append(next_coord)
+        else:
+            grasp_coord, angle = calculate_grasp_point_and_angle(subpath)
+            
+            grasp_coords.append(grasp_coord)
+            angles.append(angle)
+            
+            subpath = [next_coord]
+    
+    grasp_coord, angle = calculate_grasp_point_and_angle(subpath)
+    
+    grasp_coords.append(grasp_coord)
+    angles.append(angle)
+
+    return grasp_coords, angles
+
+def find_grasp_point_com(grasp_coords, angles, xy_com):
+    """Find grasp point closest to COM"""
+
+    shortest_dist = np.Inf
+    for i in range(len(grasp_coords)):
+        grasp_coord = grasp_coords[i]
+        dist = np.sqrt((xy_com[0]-grasp_coord[0])**2 + (xy_com[1]-grasp_coord[1])**2)
+        
+        if dist < shortest_dist:
+            shortest_dist = dist
+            i_shortest = i
+
+    grasp_pixel = [np.around(grasp_coords[i_shortest]).astype(int)]
+    angle = angles[i_shortest]
+
+    return grasp_pixel, angle
+
+def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop):
+    """Find grasp point and the end of the peduncle"""
+
+    __, peduncle_crop_bw = cv2.threshold(peduncle_crop, 127, 255, cv2.THRESH_BINARY)
+    
+    # convert peduncle image to coords
+    peduncle_coords = []
+    count = 0
+    for i in range(len(peduncle_crop_bw)):
+        for j in range(len(peduncle_crop_bw[i])):
+            if peduncle_crop_bw[i][j] == 255:
+                count += 1
+                peduncle_coords.append([i,j])
+
+    # find the two grasp points that are the furthers apart (extremes)
+    longest_dist = 0 
+    for i in range(len(grasp_coords)):
+        grasp_coord_1 = grasp_coords[i]
+        for j in range(len(grasp_coords)):
+            grasp_coord_2 = grasp_coords[j]
+            dist = np.sqrt((grasp_coord_1[0] - grasp_coord_2[0])**2 + (grasp_coord_1[1] - grasp_coord_2[1])**2)
+            if dist > longest_dist:
+                longest_dist = dist
+                extreme_1 = grasp_coord_1
+                extreme_2 = grasp_coord_2
+                index_1 = i
+                index_2 = j
+
+    extremes = [extreme_1, extreme_2]
+    _angles = [angles[index_1], angles[index_2]]
+
+    # find width of peduncle at the extremes
+    widths = []
+    for i in range(len(extremes)):
+        extreme = extremes[i]
+        angle = _angles[i]
+        width = 0
+        for j in range(1,50):
+            coord_x = int(np.around(extreme[1] + np.cos(angle)*j))
+            coord_y = int(np.around(extreme[0] + np.sin(angle)*j))
+            coord = [coord_x, coord_y]
+            if coord in peduncle_coords:
+                width += 1
+            else:
+                widths.append(width)
+                break
+    
+    # grasp points at largest width is grasp point
+    if widths[0] > widths[1]:
+        index = index_1
+    else:
+        index = index_2
+
+    grasp_pixel = [np.around(grasp_coords[index]).astype(int)]
+    angle = angles[index]
+
+    return grasp_pixel, angle

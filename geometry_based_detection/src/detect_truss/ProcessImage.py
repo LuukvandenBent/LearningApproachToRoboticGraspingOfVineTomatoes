@@ -25,7 +25,8 @@ from utils.timer import Timer
 
 from utils.util import make_dirs, load_rgb, save_img, save_fig, figure_to_image
 from utils.util import stack_segments, change_brightness
-from utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments, save_images
+from utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
+from utils.util import save_images, find_grasp_coords_and_angles, find_grasp_point_end_peduncle, find_grasp_point_com
 
 warnings.filterwarnings('error', category=FutureWarning)
 
@@ -415,73 +416,15 @@ class ProcessImage(object):
                 for j in range(len(area_y)):
                     grasp_img[area_x[i]][area_y[j]] = 0
         
-        # find possible grasp points
-        mask = []
-        for i in range(len(grasp_img)):
-            for j in range(len(grasp_img[i])):
-                if grasp_img[i][j] == 1:
-                    mask.append([i,j])
+        grasp_coords, angles = find_grasp_coords_and_angles(grasp_img)
         
-        def calculate_grasp_point_and_angle(subpath):
-            index = int(len(subpath)/2)
-            grasp_coord = subpath[index]
-            grasp_coord = [grasp_coord[1], grasp_coord[0]]
-
-            start_node = subpath[0]
-            end_node = subpath[-1]
-            dx = end_node[1] - start_node[1]
-            dy = end_node[0] - start_node[0]
-            angle = np.arctan(dy/(dx+0.001))
-
-            return grasp_coord, angle
-
-        
-        subpath = [mask[0]]
-        grasp_coords = []
-        angles = []
-        for i in range(len(mask)-1):
-            current_coord = mask[i]
-            next_coord = mask[i+1]
-            dist = np.sqrt((current_coord[0]-next_coord[0])**2 + (current_coord[1]-next_coord[1])**2)
-
-            if dist < 10:
-                subpath.append(next_coord)
-            else:
-                grasp_coord, angle = calculate_grasp_point_and_angle(subpath)
-                
-                grasp_coords.append(grasp_coord)
-                angles.append(angle)
-                
-                subpath = [next_coord]
-        
-        grasp_coord, angle = calculate_grasp_point_and_angle(subpath)
-        
-        grasp_coords.append(grasp_coord)
-        angles.append(angle)
-        
-        # mark grasp point closest to COM
         xy_com = self.com.get_coord(self.LOCAL_FRAME_ID)
 
-        shortest_dist = np.Inf
-        longest_dist = 0
-        for i in range(len(grasp_coords)):
-            grasp_coord = grasp_coords[i]
-            dist = np.sqrt((xy_com[0]-grasp_coord[0])**2 + (xy_com[1]-grasp_coord[1])**2)
-            
-            if dist < shortest_dist:
-                shortest_dist = dist
-                i_shortest = i
-
-            if dist > longest_dist:
-                longest_dist = dist
-                i_longest = i 
-        
         if self.com_grasp:
-            grasp_pixel = [np.around(grasp_coords[i_shortest]).astype(int)]
-            angle = angles[i_shortest]
+            grasp_pixel, angle = find_grasp_point_com(grasp_coords, angles, xy_com)
         else:
-            grasp_pixel = [np.around(grasp_coords[i_longest]).astype(int)]
-            angle = angles[i_longest]
+            peduncle_xy = coords_from_points(self.peduncle_points, self.LOCAL_FRAME_ID)
+            grasp_pixel, angle = find_grasp_point_end_peduncle(grasp_coords, angles, self.peduncle_crop)
 
         grasp_angle_local = angle
         grasp_angle_global = -self.angle + grasp_angle_local
@@ -870,7 +813,7 @@ def load_px_per_mm(pwd, img_id):
 
 def main():
     save = False
-    com_grasp = True
+    com_grasp = False
     drive = "backup"  # "UBUNTU 16_0"  #
 
     path = Path(os.getcwd())
@@ -893,7 +836,7 @@ def main():
     images = [i for indx,i in enumerate(data) if data[indx][-4:] == '.png']
     
     # select part of image set
-    images = images[0:13]
+    images = images[0:]
 
     i_start = 1
     i_end = len(images) + 1

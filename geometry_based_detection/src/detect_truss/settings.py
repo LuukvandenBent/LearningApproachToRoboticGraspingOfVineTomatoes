@@ -26,25 +26,31 @@ def detect_peduncle(branch_length_min_px=15,
 
 def detect_tomato(blur_size=3,
                   radius_min_frac=8,
-                  radius_max_frac=4,
-                  distance_min_frac=4,  # = tomato_radius_max
-                  radius_min_mm=30,
-                  radius_max_mm=40,
+                  radius_max_frac=6,
+                  distance_min_frac=4,  
+                  big_radius_min_mm=20,
+                  big_radius_max_mm=35,
+                  small_radius_min_mm=15,
+                  small_radius_max_mm=23,
                   dp=4,
                   param1=20,
                   param2=80,
-                  ratio_threshold=0.6):
+                  ratio_threshold=0.4,
+                  ratio_max_dist=2):
 
     settings = {'radius_min_frac': radius_min_frac,
                 'radius_max_frac': radius_max_frac,
                 'distance_min_frac': distance_min_frac,
-                'radius_min_mm': radius_min_mm,
-                'radius_max_mm': radius_max_mm,
+                'big_radius_min_mm': big_radius_min_mm,
+                'big_radius_max_mm': big_radius_max_mm,
+                'small_radius_min_mm': small_radius_min_mm,
+                'small_radius_max_mm': small_radius_max_mm,
                 'dp': dp,
                 'param1': param1,
                 'param2': param2,
                 'ratio_threshold': ratio_threshold,
-                'blur_size': blur_size}
+                'blur_size': blur_size,
+                'ratio_max_dist': ratio_max_dist}
 
     return settings
 

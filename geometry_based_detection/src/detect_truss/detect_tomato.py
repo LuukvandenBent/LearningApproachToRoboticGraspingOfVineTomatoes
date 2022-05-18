@@ -24,7 +24,7 @@ def compute_com(centers, radii):
 
 
 def detect_tomato(img_segment, settings=None, px_per_mm=None, img_rgb=None,
-                  save=False, pwd="", name="", save_tomato=False):
+                  save=False, pwd="", name="", save_tomato=False, tomato_size=None, xy_peduncle=None):
 
     if img_rgb is None:
         img_rgb = img_segment
@@ -38,8 +38,12 @@ def detect_tomato(img_segment, settings=None, px_per_mm=None, img_rgb=None,
 
     # set dimensions
     if px_per_mm:
-        radius_min_px = int(round(px_per_mm * settings['radius_min_mm']))
-        radius_max_px = int(round(px_per_mm * settings['radius_max_mm']))
+        if tomato_size == 'big':
+            radius_min_px = int(round(px_per_mm * settings['big_radius_min_mm']))
+            radius_max_px = int(round(px_per_mm * settings['big_radius_max_mm']))
+        else:
+            radius_min_px = int(round(px_per_mm * settings['small_radius_min_mm']))
+            radius_max_px = int(round(px_per_mm * settings['small_radius_max_mm']))
         distance_min_px = radius_min_px * 2
     else:
         dim = img_segment.shape
@@ -87,6 +91,25 @@ def detect_tomato(img_segment, settings=None, px_per_mm=None, img_rgb=None,
             centers = centers_overlap[i_keep, :]
             radii = radii_overlap[i_keep]
             com = compute_com(centers, radii)
+            
+        # remove tomatoes that are to far away from peduncle
+        if xy_peduncle is not None:
+            radii_avg = np.mean(radii)
+            dist_max_px = radii_avg*settings['ratio_max_dist']
+
+            i_keep = remove_far_tomatoes(centers,
+                                         radii,
+                                         xy_peduncle,
+                                         dist_max_px=dist_max_px)
+            n = len(i_keep)
+            n_no_overlap = len(radii)
+            if n != n_no_overlap:
+                print('removed', n_no_overlap - n, 'tomato(es) based on distance to peduncle')
+
+            if len(i_keep) != 0:
+                centers = centers[i_keep, :]
+                radii = radii[i_keep]
+                com = compute_com(centers, radii)
 
     # visualize result
     if save:
@@ -115,6 +138,20 @@ def find_overlapping_tomatoes(centers, radii, img_segment, ratio_threshold=0.5):
 
     return iKeep
 
+def remove_far_tomatoes(centers, radii, junction_points, dist_max_px):
+    iKeep = []
+    N = centers.shape[0]
+    for i in range(0, N):
+        center = centers[i]
+        
+        for j in range(len(junction_points)):
+            dist = np.sqrt((center[0] - junction_points[j][0])**2 + (center[1] - junction_points[j][1])**2)
+            
+            if dist < dist_max_px:
+                iKeep.append(i)
+                break
+
+    return iKeep
 
 if __name__ == '__main__':
     print("This file has no main!")

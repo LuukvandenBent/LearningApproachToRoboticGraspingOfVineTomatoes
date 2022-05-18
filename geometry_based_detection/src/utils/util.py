@@ -1056,7 +1056,7 @@ def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop):
     _angles = [angles[index_1], angles[index_2]]
 
     # find width of peduncle at the extremes
-    widths = []
+    widths = [0,0]
     for i in range(len(extremes)):
         extreme = extremes[i]
         angle = _angles[i]
@@ -1068,7 +1068,7 @@ def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop):
             if coord in peduncle_coords:
                 width += 1
             else:
-                widths.append(width)
+                widths[i] = width
                 break
     
     # grasp points at largest width is grasp point
@@ -1081,3 +1081,31 @@ def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop):
     angle = angles[index]
 
     return grasp_pixel, angle
+
+def find_mean_of_array(array):
+
+    size = (array.shape[0]*array.shape[1])
+
+    sum = 0
+    count = 0
+    for i in range(len(array)):
+        for j in range(len(array[i])):
+            if array[i][j] == 0:
+                count += 1
+            sum += array[i][j]
+
+    avg = sum/(size-count)
+
+    return avg
+
+def find_px_per_mm(depth, image_shape, field_of_view=(69,42)):
+
+    width = np.tan(np.deg2rad(max(field_of_view)/2))*depth*2
+    height = np.tan(np.deg2rad(min(field_of_view)/2))*depth*2
+
+    px_per_mm_x = max(image_shape)/width
+    px_per_mm_y = min(image_shape)/height
+
+    px_per_mm = (px_per_mm_x + px_per_mm_y)/2
+
+    return px_per_mm

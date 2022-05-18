@@ -6,8 +6,9 @@ import warnings
 import numpy as np
 import cv2
 import json
-from matplotlib import pyplot as plt
 import sys
+import pandas as pd
+from matplotlib import pyplot as plt
 from pathlib import Path
 
 
@@ -27,6 +28,10 @@ from utils.util import make_dirs, load_rgb, save_img, save_fig, figure_to_image
 from utils.util import stack_segments, change_brightness
 from utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
 from utils.util import save_images, find_grasp_coords_and_angles, find_grasp_point_end_peduncle, find_grasp_point_com
+from utils.util import find_mean_of_array, find_px_per_mm
+
+from bbox_detection.bbox_detection import get_detection_model
+from bbox_detection.bbox_detection import predict_truss
 
 warnings.filterwarnings('error', category=FutureWarning)
 
@@ -69,17 +74,19 @@ class ProcessImage(object):
         self.grasp_angle_global = None
 
         self.skeleton_img = None
+        self.tomato_size = None
 
         self.settings = settings.initialize_all()
 
-    def add_image(self, img_rgb, px_per_mm=None, name=None):
+    def add_image(self, img_rgb, tomato_info=None, name=None):
 
         # TODO: scaling is currently not supported, would be interesting to reduce computing power
 
         self.scale = 1.0
         self.img_rgb = img_rgb
         self.shape = img_rgb.shape[:2]
-        self.px_per_mm = px_per_mm
+        self.px_per_mm = tomato_info['px_per_mm']
+        self.tomato_size = tomato_info['tomato_size']
 
         self.grasp_point = None
         self.grasp_angle_local = None
@@ -238,14 +245,18 @@ class ProcessImage(object):
         else:
             img_bg = self.img_rgb_crop
 
+        xy_peduncle = coords_from_points(self.junction_points, self.LOCAL_FRAME_ID)
+        
         centers, radii, com = detect_tomato(self.tomato_crop,
                                             self.settings['detect_tomato'],
-                                            # px_per_mm=self.px_per_mm,
+                                            px_per_mm=self.px_per_mm,
                                             img_rgb=img_bg,
                                             save=self.save,
                                             pwd=pwd,
                                             name=self.name,
-                                            save_tomato=True)
+                                            save_tomato=True,
+                                            tomato_size=self.tomato_size,
+                                            xy_peduncle=xy_peduncle)
 
         # convert obtained coordinated to two-dimensional points linked to a coordinate frame
         self.radii = radii
@@ -770,14 +781,14 @@ class ProcessImage(object):
             print ("Failed to crop image")
             return success
 
-        success = self.detect_tomatoes()
-        if success is False:
-            print ("Failed to detect tomatoes")
-            return success
-
         success = self.detect_peduncle()
         if success is False:
             print ("Failed to detect peduncle")
+            return success
+
+        success = self.detect_tomatoes()
+        if success is False:
+            print ("Failed to detect tomatoes")
             return success
 
         success = self.detect_grasp_location()
@@ -797,9 +808,63 @@ class ProcessImage(object):
             for key_2 in settings[key_1]:
                 self.settings[key_1][key_2] = settings[key_1][key_2]
 
+@Timer("bounding_box_detection")
+def bounding_box_detection(pwd_root=None, tomato_size=None):
+    """
+    Bounding box detection
+
+    Output: saved bboxed images
+    """
+    
+    pwd_images = os.path.join(pwd_root, "data/bboxed_images/")
+    pwd_full_size_images = os.path.join(pwd_root, "data/images/")
+    pwd_detections = os.path.join(pwd_root, "results/bbox_detection/")
+
+    images_list = os.listdir(pwd_full_size_images)
+    images = [i for indx,i in enumerate(images_list) if images_list[indx][-4:] == '.png']
+    
+    images = images
+    inference_model = get_detection_model()
+
+    for count, file_name in enumerate(images):
+        print(f"Predicting trusses in image '{file_name}' ({count+1}/{len(images)})")
+
+        rgb_data = load_rgb(file_name, pwd=pwd_full_size_images, horizontal=True)
+        num_detections = predict_truss(rgb_data, inference_model, pwd_detections=pwd_detections, pwd_images=pwd_images, file_name=file_name)
+
+        generate_tomato_info(pwd_root=pwd_root, file_name=file_name, tomato_size=tomato_size, num_detections=num_detections)
+
+def generate_tomato_info(pwd_root=None, file_name=None, tomato_size=None, num_detections=None):
+    """
+    Generates tomato_info json files for bboxed images
+
+    Output: json file with 'px_per_mm' and 'tomato_size'
+    """
+    path = Path(os.getcwd())
+    pwd_root = os.path.join(path.parent.parent, "doc/realsense_images/")
+
+    pwd_depth_images = os.path.join(pwd_root, "data/depth_images/")
+    file_name = file_name[:-4] + '.csv'
+    pwd_depth_image = os.path.join(pwd_depth_images, file_name)
+    
+    df = pd.read_csv(pwd_depth_image, delimiter=';')
+
+    # remove index column if present
+    if df.shape[1] % 2 != 0:
+        df.drop(df.columns[0], axis=1, inplace=True)
+    
+    array = pd.DataFrame.to_numpy(df, dtype=int)
+    avg_depth = find_mean_of_array(array)
+    px_per_mm = find_px_per_mm(avg_depth, array.shape)
+    json_data = {'px_per_mm': px_per_mm,
+                 'tomato_size': tomato_size}
+    for i in range(num_detections):
+        pwd_json_file = os.path.join(pwd_root, 'data/json/' + file_name[:-4] + '_' + str(i) + '.json')
+        with open(pwd_json_file, "w") as write_file:
+            json.dump(json_data, write_file)
 
 def load_px_per_mm(pwd, img_id):
-    pwd_info = os.path.join(pwd, '001' + '_info.json')
+    pwd_info = os.path.join(pwd, img_id[:-4] + '.json')
 
     if not os.path.exists(pwd_info):
         print('Info does not exist for image: ' + img_id + ' continuing without info')
@@ -808,35 +873,47 @@ def load_px_per_mm(pwd, img_id):
     with open(pwd_info, "r") as read_file:
         data_inf = json.load(read_file)
 
-    return data_inf['px_per_mm']*1.67*1.8 #TODO: remove *1.67
-
+        if 'tomato_size' in data_inf.keys():
+            tomato_info = {'px_per_mm': data_inf['px_per_mm'],
+                           'tomato_size': data_inf['tomato_size']}
+        else:
+            tomato_info = {'px_per_mm': data_inf['px_per_mm'],
+                           'tomato_size': 'big'}
+    return tomato_info
 
 def main():
     save = False
-    com_grasp = False
+    com_grasp = True
+    bbox_detection = False
+    tomato_size = 'small'
     drive = "backup"  # "UBUNTU 16_0"  #
 
     path = Path(os.getcwd())
-    pwd_root = os.path.join(path.parent.parent, "doc/")
 
-    dataset = ""
-    pwd_data = os.path.join(pwd_root, "data", dataset)
-    pwd_results = os.path.join(pwd_root, "results", dataset)
-    pwd_json = os.path.join(pwd_results, 'json')
+    if bbox_detection:
+        pwd_root = os.path.join(path.parent.parent, "doc/realsense_images/")
+        bounding_box_detection(pwd_root=pwd_root, tomato_size=tomato_size)
+    else:
+        pwd_root = os.path.join(path.parent.parent, "doc/realsense_images/")
+
+    pwd_images = os.path.join(pwd_root, "data/bboxed_images")
+    pwd_json_read = os.path.join(pwd_root, "data/json")
+    pwd_results = os.path.join(pwd_root, "results/")
+    pwd_json_dump = os.path.join(pwd_results, 'json/')
 
     make_dirs(pwd_results)
-    make_dirs(pwd_json)
+    make_dirs(pwd_json_dump)
 
     process_image = ProcessImage(use_truss=True,
                                  pwd=pwd_results,
                                  save=save,
                                  com_grasp=com_grasp)
     
-    data = os.listdir(pwd_data)
+    data = os.listdir(pwd_images)
     images = [i for indx,i in enumerate(data) if data[indx][-4:] == '.png']
     
     # select part of image set
-    images = images[0:]
+    images = images[30:33]
 
     i_start = 1
     i_end = len(images) + 1
@@ -848,9 +925,9 @@ def main():
         tomato_name = i_tomato
         file_name = i_tomato
 
-        rgb_data = load_rgb(file_name, pwd=pwd_data, horizontal=True)
-        px_per_mm = load_px_per_mm(pwd_data, tomato_name)
-        process_image.add_image(rgb_data, px_per_mm=px_per_mm, name=tomato_name)
+        rgb_data = load_rgb(file_name, pwd=pwd_images, horizontal=True)
+        tomato_info = load_px_per_mm(pwd_json_read, tomato_name)
+        process_image.add_image(rgb_data, tomato_info=tomato_info, name=tomato_name)
 
         success = process_image.process_image()
         process_image.get_truss_visualization(local=True, save=True, show_grasp_area=True)
@@ -858,7 +935,7 @@ def main():
 
         json_data = process_image.get_object_features()
 
-        pwd_json_file = os.path.join(pwd_json, tomato_name + '.json')
+        pwd_json_file = os.path.join(pwd_json_dump, tomato_name + '.json')
         with open(pwd_json_file, "w") as write_file:
             json.dump(json_data, write_file)
         

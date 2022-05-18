@@ -240,12 +240,12 @@ def segment_truss_2(img_hsv, img_rgb, pwd = None, name = None, save=True):
 
     # create red mask
     # lower mask 
-    lower_red = np.array([0,50,0])
+    lower_red = np.array([0,100,0])
     upper_red = np.array([20,255,255])
     mask0 = cv2.inRange(img_hsv, lower_red, upper_red)
 
     # upper mask
-    lower_red = np.array([160,50,0])
+    lower_red = np.array([160,100,0])
     upper_red = np.array([180,255,255])
     mask1 = cv2.inRange(img_hsv, lower_red, upper_red)
 

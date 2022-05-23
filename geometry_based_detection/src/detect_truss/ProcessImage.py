@@ -491,7 +491,12 @@ class ProcessImage(object):
         peduncle_xy = coords_from_points(self.peduncle_points, frame_id)
         junc_xy = coords_from_points(self.junction_points, frame_id)
         end_xy = coords_from_points(self.end_points, frame_id)
-        peduncle = {'junctions': junc_xy, 'ends': end_xy, 'peduncle': peduncle_xy}
+        
+        peduncle_dx = abs(end_xy[0][0] - end_xy[1][0])
+        peduncle_dy = abs(end_xy[0][1] - end_xy[1][1])
+        peduncle_length = np.sqrt(peduncle_dx**2 + peduncle_dy**2)
+        peduncle_middle_point = [min(end_xy[0][0], end_xy[1][0]) + peduncle_dx/2, min(end_xy[0][1], end_xy[1][1])+ peduncle_dy/2]
+        peduncle = {'junctions': junc_xy, 'ends': end_xy, 'peduncle_length': peduncle_length, 'peduncle_middle_point': peduncle_middle_point, 'peduncle': peduncle_xy}
         return peduncle
 
     def get_grasp_location(self, local=False):
@@ -565,16 +570,16 @@ class ProcessImage(object):
 
         return skeleton_img
 
-    def get_object_features(self):
+    def get_object_features(self, tomato_info=None):
         """
         Returns a dictionary containing the grasp_location, peduncle, and tomato
         """
         tomatoes = self.get_tomatoes()
         peduncle = self.get_peduncle()
-        # grasp_location = self.get_grasp_location()
         grasp_location, __, __ = self.get_grasp_points()
 
         object_feature = {
+            "tomato_info": tomato_info,
             "grasp_location": grasp_location,
             "tomato": tomatoes,
             "peduncle": peduncle
@@ -882,6 +887,8 @@ def load_px_per_mm(pwd, img_id):
     return tomato_info
 
 def main():
+    DIRECTORY = 'realsense_images/'
+    # DIRECTORY = 'cropped_images/'
     save = False
     com_grasp = True
     bbox_detection = False
@@ -891,10 +898,10 @@ def main():
     path = Path(os.getcwd())
 
     if bbox_detection:
-        pwd_root = os.path.join(path.parent.parent, "doc/realsense_images/")
+        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
         bounding_box_detection(pwd_root=pwd_root, tomato_size=tomato_size)
     else:
-        pwd_root = os.path.join(path.parent.parent, "doc/realsense_images/")
+        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
 
     pwd_images = os.path.join(pwd_root, "data/bboxed_images")
     pwd_json_read = os.path.join(pwd_root, "data/json")
@@ -913,7 +920,7 @@ def main():
     images = [i for indx,i in enumerate(data) if data[indx][-4:] == '.png']
     
     # select part of image set
-    images = images[30:33]
+    images = images[0:1]
 
     i_start = 1
     i_end = len(images) + 1
@@ -933,7 +940,7 @@ def main():
         process_image.get_truss_visualization(local=True, save=True, show_grasp_area=True)
         process_image.get_truss_visualization(local=False, save=True, show_grasp_area=False)
 
-        json_data = process_image.get_object_features()
+        json_data = process_image.get_object_features(tomato_info=tomato_info)
 
         pwd_json_file = os.path.join(pwd_json_dump, tomato_name + '.json')
         with open(pwd_json_file, "w") as write_file:

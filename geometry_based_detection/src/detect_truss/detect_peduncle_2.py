@@ -101,10 +101,29 @@ def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, sa
     return path_img, branch_data, junc_coords, end_coords
 
 
-def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=None, timeout=10000, do_animate=True):
+def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=None, timeout=1000000000, do_animate=True):
     # initialize
     best_path = []
     best_length = 0
+
+    # min distance to junction/end_coord 
+    threshold = 7
+
+    junc_coords = None
+    for i in range(len(junc_nodes)):
+        _coord = np.rint(pixel_coordinates[junc_nodes[i]])
+        if junc_coords is None:
+            junc_coords = _coord
+        else:
+            junc_coords = np.vstack((junc_coords, _coord))
+
+    end_coords = None
+    for i in range(len(end_nodes)):
+        _coord = np.rint(pixel_coordinates[end_nodes[i]])
+        if end_coords is None:
+            end_coords = _coord
+        else:
+            end_coords = np.vstack((end_coords, _coord))
 
     if do_animate:
         start_nodes = [384]
@@ -139,8 +158,25 @@ def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=Non
                 if from_node == -9999:
                     break
 
-                if (from_node == junc_nodes).any() or np.any(from_node == end_nodes).any():
-                    new_coord = pixel_coordinates[from_node]
+                coord_from_node = np.rint(pixel_coordinates[from_node])
+
+                stop = False
+            
+                for i in range(len(junc_coords)):
+                    dx = abs(coord_from_node[0] - junc_coords[i][0])
+                    dy = abs(coord_from_node[1] - junc_coords[i][1])
+                    if dx <= threshold and dy <= threshold:
+                        stop = True
+                
+                for i in range(len(end_coords)):
+                    dx = abs(coord_from_node[0] - end_coords[i][0])
+                    dy = abs(coord_from_node[1] - end_coords[i][1])
+                    if dx <= threshold and dy <= threshold:
+                        stop = True
+
+                if stop is True:
+                    new_coord = pixel_coordinates[from_node]                   
+                    angle_total = node_coord_angle(init_coord, new_coord)
                     angle_new = node_coord_angle(coord, new_coord)
 
                     if angle_total is None:
@@ -148,14 +184,10 @@ def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=Non
                     else:
                         diff = abs(angle_total - angle_new)
 
-                    if diff < 45:
+                    if diff < 45 or len(subpath) < min(bg_image.shape[:2])/50:
                         angle_total = node_coord_angle(init_coord, new_coord)  # angle_new
-
                         path.extend(subpath)
                         branch_data.append(subpath)
-                        if len(subpath) == 0:
-                            print(subpath)
-
                         subpath = []  # TODO: was fist an empty list! from_node
 
                     else:
@@ -181,16 +213,8 @@ def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=Non
                 if do_animate:
                     my_animation.add_frame(path, subpath, start_node, end_node)
 
-            if len(path) > 1:
-                length = dist[(path[0], path[-1])]
-
-            if length >= best_length:
-                best_path = path
-                best_length = length
-                best_branch_data = branch_data
-
         if do_animate:
-            my_animation.save()
+            my_animation.save()     
 
     return best_path, best_length, best_branch_data
 

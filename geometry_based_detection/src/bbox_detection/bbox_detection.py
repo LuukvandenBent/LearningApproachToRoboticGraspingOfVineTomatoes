@@ -67,8 +67,8 @@ def predict_truss(image, inference_model, pwd_detections=None, pwd_images=None, 
         file_name=file_name
     )
 
-    save_bboxed_images(image, bboxes_pred, desired_size, pwd_images=pwd_images, file_name=file_name)
+    bboxes = save_bboxed_images(image, bboxes_pred, desired_size, pwd_images=pwd_images, file_name=file_name)
 
-    return num_detections
+    return num_detections, bboxes
 
 

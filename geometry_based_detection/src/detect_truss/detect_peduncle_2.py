@@ -413,7 +413,7 @@ def visualize_skeleton(img, skeleton_img, skeletonize=False, coord_junc=None, co
             add_circles(grasp_points, radii=6, fc=grasp_area_color, linewidth=0, zorder=7)
     
     if grasp is not None:
-        add_circles(grasp['xy'], radii=8, fc=(0,0,255), linewidth=0, zorder=7)
+        add_circles(grasp['bboxed_image']['xy'], radii=8, fc=(0,0,255), linewidth=0, zorder=7)
             
     if (len(np.argwhere(skeleton_img)) > 2) and show_nodes:
 

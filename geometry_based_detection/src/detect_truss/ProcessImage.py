@@ -75,10 +75,12 @@ class ProcessImage(object):
 
         self.skeleton_img = None
         self.tomato_size = None
+        self.depth = None
+        self.peduncle_width = 3.5 # [mm]
 
         self.settings = settings.initialize_all()
 
-    def add_image(self, img_rgb, tomato_info=None, name=None):
+    def add_image(self, img_rgb, tomato_info=None, name=None, depth_data=None):
 
         # TODO: scaling is currently not supported, would be interesting to reduce computing power
 
@@ -87,10 +89,16 @@ class ProcessImage(object):
         self.shape = img_rgb.shape[:2]
         self.px_per_mm = tomato_info['px_per_mm']
         self.tomato_size = tomato_info['tomato_size']
+        self.depth = depth_data
 
         self.grasp_point = None
         self.grasp_angle_local = None
         self.grasp_angle_global = None
+
+        if 'bbox' in tomato_info.keys():
+            self.bbox_image = tomato_info['bbox']
+        else:
+            self.bbox_image = None
 
         if name is not None:
             self.name = name
@@ -531,10 +539,17 @@ class ProcessImage(object):
         if self.grasp_point is not None:
             [xy] = coords_from_points(self.grasp_point, frame_id)
             grasp_pixel = np.around(xy).astype(int)
-            row = grasp_pixel[1]
-            col = grasp_pixel[0]
-            grasp = {"xy": xy, "row": int(row), "col": int(col), "angle": angle}
+            x = grasp_pixel[1]
+            y = grasp_pixel[0]
 
+            grasp = {'bboxed_image':{"xy": xy, "x": int(x), "y": int(y), "angle": angle}}
+
+            if self.bbox_image is not None:
+                full_size_image_xy = [int(grasp_pixel[0] + self.bbox_image[1]), int(grasp_pixel[1] + self.bbox_image[0])]
+                full_size_image_x = full_size_image_xy[1]
+                full_size_image_y = full_size_image_xy[0]
+            
+                grasp['full_size_image'] = {"xy": full_size_image_xy, "x": full_size_image_x, "y": full_size_image_y, "angle": angle}
         
         if not show_grasp_area:
             grasp_img = grasp_points = None
@@ -552,6 +567,40 @@ class ProcessImage(object):
             grasp_img[rc_peduncle[:, 0], rc_peduncle[:, 1]] = 1
         
         return grasp, grasp_img, grasp_points
+
+    def get_distance_to_camera(self, grasp=None, tomato_info=None):
+        
+        depth_image = self.depth
+
+        dx = grasp['full_size_image']['x'] - depth_image.shape[1]/2
+        dy = grasp['full_size_image']['y'] - depth_image.shape[0]/2
+
+        dx_in_mm = dx/self.px_per_mm
+        dy_in_mm = dy/self.px_per_mm
+
+        xy = grasp['full_size_image']['xy']
+        x = xy[0]
+        y = xy[1]
+        window_size = round(self.peduncle_width/2 * self.px_per_mm)
+        
+        z_array = depth_image[x-window_size:x+window_size+1, y-window_size:y+window_size+1]
+        mean = np.average(z_array)
+
+        count = 0
+        _sum = 0
+        for i in range(len(z_array)):
+            for j in range(len(z_array[i])):
+                if abs(z_array[i][j] - mean) > 0.1*mean:
+                    continue
+                else:
+                    count += 1
+                    _sum += z_array[i][j]
+        
+        dz_in_mm = _sum/count
+
+        distance = {'dx': dx_in_mm, 'dy': dy_in_mm, 'dz': dz_in_mm}
+
+        return distance
 
     def get_skeleton_img(self, img_shape, local=False):
         if local:
@@ -578,9 +627,15 @@ class ProcessImage(object):
         peduncle = self.get_peduncle()
         grasp_location, __, __ = self.get_grasp_points()
 
+        if self.depth is not None:
+            distance_to_camera = self.get_distance_to_camera(grasp=grasp_location, tomato_info=tomato_info)
+        else:
+            distance_to_camera = 'no data available'
+        
         object_feature = {
             "tomato_info": tomato_info,
             "grasp_location": grasp_location,
+            "distance_to_camera[mm]": distance_to_camera,
             "tomato": tomatoes,
             "peduncle": peduncle
         }
@@ -639,7 +694,7 @@ class ProcessImage(object):
         visualize_skeleton(img, skeleton_img, coord_junc=xy_junc, show_img=False, skeleton_width=skeleton_width, 
                             show_grasp_area=show_grasp_area,grasp=grasp,grasp_img=grasp_img,grasp_points=grasp_points)
         
-        if (grasp["xy"] is not None) and (grasp["angle"] is not None):
+        if (grasp['bboxed_image']["xy"] is not None) and (grasp['bboxed_image']["angle"] is not None):
             settings = self.settings['compute_grasp']
             if self.px_per_mm is not None:
                 minimum_grasp_length_px = self.px_per_mm * settings['grasp_length_min_mm']
@@ -647,7 +702,7 @@ class ProcessImage(object):
                 finger_thickenss_px = settings['finger_thinkness_mm'] * self.px_per_mm
             else:
                 minimum_grasp_length_px = settings['grasp_length_min_px']
-            plot_grasp_location(grasp["xy"], grasp["angle"], finger_width=minimum_grasp_length_px,
+            plot_grasp_location(grasp['bboxed_image']["xy"], grasp['bboxed_image']["angle"], finger_width=minimum_grasp_length_px,
                                 finger_thickness=finger_thickenss_px, finger_dist=open_dist_px, linewidth=grasp_linewidth)
 
         if save:
@@ -828,23 +883,29 @@ def bounding_box_detection(pwd_root=None, tomato_size=None):
     images_list = os.listdir(pwd_full_size_images)
     images = [i for indx,i in enumerate(images_list) if images_list[indx][-4:] == '.png']
     
-    images = images
+    images = images[:1]
     inference_model = get_detection_model()
 
     for count, file_name in enumerate(images):
         print(f"Predicting trusses in image '{file_name}' ({count+1}/{len(images)})")
 
         rgb_data = load_rgb(file_name, pwd=pwd_full_size_images, horizontal=True)
-        num_detections = predict_truss(rgb_data, inference_model, pwd_detections=pwd_detections, pwd_images=pwd_images, file_name=file_name)
+        num_detections, bboxes_pred = predict_truss(rgb_data, inference_model, pwd_detections=pwd_detections, pwd_images=pwd_images, file_name=file_name)
 
-        generate_tomato_info(pwd_root=pwd_root, file_name=file_name, tomato_size=tomato_size, num_detections=num_detections)
+        generate_tomato_info(pwd_root=pwd_root, file_name=file_name, tomato_size=tomato_size, 
+                            num_detections=num_detections, bboxes=bboxes_pred, full_size_image_shape=rgb_data.shape[:2])
 
-def generate_tomato_info(pwd_root=None, file_name=None, tomato_size=None, num_detections=None):
+def generate_tomato_info(pwd_root=None, file_name=None, tomato_size=None, num_detections=None, bboxes=None, full_size_image_shape=None):
     """
     Generates tomato_info json files for bboxed images
 
-    Output: json file with 'px_per_mm' and 'tomato_size'
+    Output: json file with:
+     - px_per_mm
+     - tomato_size
+     - bbox coordinates
+     - full_size_image_shape
     """
+
     path = Path(os.getcwd())
     pwd_root = os.path.join(path.parent.parent, "doc/realsense_images/")
 
@@ -858,17 +919,20 @@ def generate_tomato_info(pwd_root=None, file_name=None, tomato_size=None, num_de
     if df.shape[1] % 2 != 0:
         df.drop(df.columns[0], axis=1, inplace=True)
     
-    array = pd.DataFrame.to_numpy(df, dtype=int)
+    array = pd.DataFrame.to_numpy(df, dtype=int)    
     avg_depth = find_mean_of_array(array)
     px_per_mm = find_px_per_mm(avg_depth, array.shape)
-    json_data = {'px_per_mm': px_per_mm,
-                 'tomato_size': tomato_size}
+    
     for i in range(num_detections):
+        json_data = {'px_per_mm': px_per_mm,
+                    'tomato_size': tomato_size,
+                    'bbox': bboxes[i],
+                    'full_size_image_shape': full_size_image_shape}
         pwd_json_file = os.path.join(pwd_root, 'data/json/' + file_name[:-4] + '_' + str(i) + '.json')
         with open(pwd_json_file, "w") as write_file:
             json.dump(json_data, write_file)
 
-def load_px_per_mm(pwd, img_id):
+def load_tomato_info(pwd, img_id):
     pwd_info = os.path.join(pwd, img_id[:-4] + '.json')
 
     if not os.path.exists(pwd_info):
@@ -878,13 +942,39 @@ def load_px_per_mm(pwd, img_id):
     with open(pwd_info, "r") as read_file:
         data_inf = json.load(read_file)
 
+        tomato_info = {'px_per_mm': data_inf['px_per_mm']}
+
+        if 'bbox' in data_inf.keys():
+            tomato_info['bbox'] = data_inf['bbox']
+
         if 'tomato_size' in data_inf.keys():
-            tomato_info = {'px_per_mm': data_inf['px_per_mm'],
-                           'tomato_size': data_inf['tomato_size']}
+            tomato_info['tomato_size'] = data_inf['tomato_size']
         else:
-            tomato_info = {'px_per_mm': data_inf['px_per_mm'],
-                           'tomato_size': 'big'}
+            tomato_info['tomato_size'] = 'big'
+
     return tomato_info
+
+def load_depth(pwd_root=None, file_name=None):
+    '''Load depth data if it's available'''
+    
+    try:
+        pwd_depth_images = os.path.join(pwd_root, "data/depth_images/")
+        file_name = file_name[:-6] + '.csv'
+        pwd_depth_image = os.path.join(pwd_depth_images, file_name)
+        
+        df = pd.read_csv(pwd_depth_image, delimiter=';')
+
+        # remove index column if present
+        if df.shape[1] % 2 != 0:
+            df.drop(df.columns[0], axis=1, inplace=True)
+        
+        depth_data = pd.DataFrame.to_numpy(df, dtype=int)
+
+    except:
+        print(f"No depth data available for image: {file_name}")
+        depth_data=None
+    
+    return depth_data
 
 def main():
     DIRECTORY = 'realsense_images/'
@@ -933,8 +1023,9 @@ def main():
         file_name = i_tomato
 
         rgb_data = load_rgb(file_name, pwd=pwd_images, horizontal=True)
-        tomato_info = load_px_per_mm(pwd_json_read, tomato_name)
-        process_image.add_image(rgb_data, tomato_info=tomato_info, name=tomato_name)
+        tomato_info = load_tomato_info(pwd_json_read, tomato_name)
+        depth_data = load_depth(pwd_root=pwd_root, file_name=file_name)
+        process_image.add_image(rgb_data, tomato_info=tomato_info, name=tomato_name, depth_data=depth_data)
 
         success = process_image.process_image()
         process_image.get_truss_visualization(local=True, save=True, show_grasp_area=True)

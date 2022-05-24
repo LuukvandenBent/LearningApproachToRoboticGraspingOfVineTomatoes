@@ -1,0 +1,36 @@
+<package format="2">
+  <name>flex_grasp</name>
+  <version>0.0.0</version>
+  <description>A ROS packages for manipulating vine tomato.</description>
+  <author email="taeke.dehaan@live.nl">Taeke de Haan</author>
+  <maintainer email="taeke.dehaan@live.nl">Taeke de Haan</maintainer>
+
+  <license>BSD</license>
+
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>message_generation</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>moveit_core</exec_depend>
+  <exec_depend>moveit_ros_planning_interface</exec_depend>
+  <exec_depend>moveit_ros_planning</exec_depend>
+  <exec_depend>aruco_ros</exec_depend>
+  <exec_depend>rgbd_launch</exec_depend>
+
+
+  <!-- python dependencies-->
+  <exec_depend>python-numpy</exec_depend>
+  <exec_depend>python-pyrealsense2-pip</exec_depend>
+
+
+  <exec_depend>gazebo_ros</exec_depend>
+  <!-- For custom messages -->
+
+  <exec_depend>message_runtime</exec_depend>
+
+</package>

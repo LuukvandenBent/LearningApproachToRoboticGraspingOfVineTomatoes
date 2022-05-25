@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<launch>
+
+	<!-- The gui should only launch when all nodes are running, when experiencing issues tune this value-->
+	<arg name="gui_start_delay"			default="8"/>
+  	
+	  <!-- debug settings -->
+	<arg name="pipeline_debug"			default="false"/>
+	<arg name="object_detection_debug"	default="false"/>
+  
+	<node name = "my_rqt_dashboard"
+			pkg = "rqt_gui"
+			type = "rqt_gui"
+			respawn = "false"
+			output = "screen"
+			args = "--perspective-file $(find rqt_user_interface)/config/my_dashboard.perspective"
+			launch-prefix="bash -c 'sleep $(arg gui_start_delay); $0 $@' "/>
+
+
+	<node name="pipeline"
+			pkg="flex_grasp"
+			type="pipeline.py"
+			output="screen">
+			<param name ="debug" value="$(arg pipeline_debug)"/>
+	</node>
+
+  	<node name="object_detection"
+			pkg="flex_grasp"
+			type="object_detection_node.py"
+			output="screen">
+			<param name ="debug" value="$(arg object_detection_debug)"/>
+	</node>
+</launch>
+

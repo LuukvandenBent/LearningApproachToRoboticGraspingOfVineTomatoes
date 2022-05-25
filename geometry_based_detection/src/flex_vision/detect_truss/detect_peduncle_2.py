@@ -13,9 +13,9 @@ from matplotlib import animation
 
 from sklearn import linear_model
 
-from utils.util import add_circles, add_arrows, add_contour, add_strings
-from utils.util import plot_image, save_fig
-from utils.util import remove_blobs, bin2img, img2bin, save_images
+from flex_vision.utils.util import add_circles, add_arrows, add_contour, add_strings
+from flex_vision.utils.util import plot_image, save_fig
+from flex_vision.utils.util import remove_blobs, bin2img, img2bin, save_images
 from sklearn.metrics.pairwise import euclidean_distances
 import matplotlib as mpl
 from PIL import Image

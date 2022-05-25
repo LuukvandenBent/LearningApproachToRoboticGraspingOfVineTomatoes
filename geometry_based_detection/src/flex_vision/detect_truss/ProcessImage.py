@@ -12,26 +12,26 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 
 
-from filter_segments import filter_segments
-from detect_peduncle_2 import detect_peduncle, visualize_skeleton, get_node_coord
-from detect_tomato import detect_tomato
-from segment_image import segment_truss, segment_truss_2
-import settings
+from flex_vision.detect_truss.filter_segments import filter_segments
+from flex_vision.detect_truss.detect_peduncle_2 import detect_peduncle, visualize_skeleton, get_node_coord
+from flex_vision.detect_truss.detect_tomato import detect_tomato
+from flex_vision.detect_truss.segment_image import segment_truss, segment_truss_2
+import flex_vision.detect_truss.settings as settings
 
 sys.path.append("../")
 
-from utils import imgpy
-from utils.geometry import Point2D, Transform, points_from_coords, coords_from_points
-from utils.timer import Timer
+from flex_vision.utils import imgpy
+from flex_vision.utils.geometry import Point2D, Transform, points_from_coords, coords_from_points
+from flex_vision.utils.timer import Timer
 
-from utils.util import make_dirs, load_rgb, save_img, save_fig, figure_to_image
-from utils.util import stack_segments, change_brightness
-from utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
-from utils.util import save_images, find_grasp_coords_and_angles, find_grasp_point_end_peduncle, find_grasp_point_com
-from utils.util import find_mean_of_array, find_px_per_mm
+from flex_vision.utils.util import make_dirs, load_rgb, save_img, save_fig, figure_to_image
+from flex_vision.utils.util import stack_segments, change_brightness
+from flex_vision.utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
+from flex_vision.utils.util import save_images, find_grasp_coords_and_angles, find_grasp_point_end_peduncle, find_grasp_point_com
+from flex_vision.utils.util import find_mean_of_array, find_px_per_mm
 
-from bbox_detection.bbox_detection import get_detection_model
-from bbox_detection.bbox_detection import predict_truss
+from flex_vision.bbox_detection.bbox_detection import get_detection_model
+from flex_vision.bbox_detection.bbox_detection import predict_truss
 
 warnings.filterwarnings('error', category=FutureWarning)
 

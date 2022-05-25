@@ -15,17 +15,17 @@ from PIL import Image
 from matplotlib import pyplot as plt
 from matplotlib import cm
 import matplotlib as mpl
-import settings
+import flex_vision.detect_truss.settings as settings
 
 from sklearn.metrics.pairwise import euclidean_distances
 
 # custom functions
-from utils.util import bin2img
-from utils.util import save_fig
-from utils.util import angular_difference
-from utils.util import plot_segments
-from utils.util import grey_2_rgb
-from utils.util import save_images
+from flex_vision.utils.util import bin2img
+from flex_vision.utils.util import save_fig
+from flex_vision.utils.util import angular_difference
+from flex_vision.utils.util import plot_segments
+from flex_vision.utils.util import grey_2_rgb
+from flex_vision.utils.util import save_images
 
 final_image_id = '015' # used for plotting
 LINEWIDTH = 3.4  # inch

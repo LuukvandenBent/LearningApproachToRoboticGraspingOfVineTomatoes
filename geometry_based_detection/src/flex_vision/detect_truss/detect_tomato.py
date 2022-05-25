@@ -12,7 +12,7 @@ import os
 from PIL import Image
 
 # custom functions
-from utils.util import plot_features, save_images
+from flex_vision.utils.util import plot_features, save_images
 
 def compute_com(centers, radii):
     """

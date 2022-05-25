@@ -11,7 +11,7 @@ import cv2
 import sys
 
 sys.path.append("../")
-from utils.util import remove_blobs
+from flex_vision.utils.util import remove_blobs
 
 def filter_segments(tomato, peduncle, background, settings=None):
     # tomato

@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 import matplotlib as mpl
 from PIL import Image
 
-from utils import color_maps
+from flex_vision.utils import color_maps
 import matplotlib.gridspec as gridspec
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 

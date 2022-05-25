@@ -9,13 +9,13 @@ import tensorflow as tf
 from pathlib import Path
 import os
 
-from bbox_detection.util import RetinaNet
-from bbox_detection.util import DecodePredictions
-from bbox_detection.util import get_backbone
-from bbox_detection.util import prepare_image
-from bbox_detection.util import visualize_detections
-from bbox_detection.util import resize_image
-from bbox_detection.util import save_bboxed_images
+from flex_vision.bbox_detection.util import RetinaNet
+from flex_vision.bbox_detection.util import DecodePredictions
+from flex_vision.bbox_detection.util import get_backbone
+from flex_vision.bbox_detection.util import prepare_image
+from flex_vision.bbox_detection.util import visualize_detections
+from flex_vision.bbox_detection.util import resize_image
+from flex_vision.bbox_detection.util import save_bboxed_images
 
 
 def get_detection_model():

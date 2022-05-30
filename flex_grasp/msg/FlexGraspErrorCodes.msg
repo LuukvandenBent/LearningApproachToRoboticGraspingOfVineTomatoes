@@ -26,3 +26,6 @@ int32 TRANSFORM_POSE_FAILED=300
 # dynamixel error
 int32 DYNAMIXEL_ERROR = 400
 int32 DYNAMIXEL_SEVERE_ERROR = 401
+
+# object detection error
+int32 NO_OBJECT_DETECTED = 500

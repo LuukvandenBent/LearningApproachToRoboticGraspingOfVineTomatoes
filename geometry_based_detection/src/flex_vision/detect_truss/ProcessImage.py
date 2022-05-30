@@ -29,6 +29,7 @@ from flex_vision.utils.util import stack_segments, change_brightness
 from flex_vision.utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
 from flex_vision.utils.util import save_images, find_grasp_coords_and_angles, find_grasp_point_end_peduncle, find_grasp_point_com
 from flex_vision.utils.util import find_mean_of_array, find_px_per_mm
+from flex_vision.utils.util import create_bboxed_images
 
 from flex_vision.bbox_detection.bbox_detection import get_detection_model
 from flex_vision.bbox_detection.bbox_detection import predict_truss
@@ -262,7 +263,7 @@ class ProcessImage(object):
                                             save=self.save,
                                             pwd=pwd,
                                             name=self.name,
-                                            save_tomato=True,
+                                            save_tomato=False,
                                             tomato_size=self.tomato_size,
                                             xy_peduncle=xy_peduncle)
 
@@ -293,7 +294,8 @@ class ProcessImage(object):
                                                                      save=self.save,
                                                                      bg_img=img_bg,
                                                                      name=self.name,
-                                                                     pwd=pwd)
+                                                                     pwd=pwd,
+                                                                     save_skeleton=False)
         # convert to 2D points
         peduncle_points = points_from_coords(np.argwhere(mask)[:, (1, 0)], self.LOCAL_FRAME_ID, self.transform)
         junction_points = points_from_coords(junc_coords, self.LOCAL_FRAME_ID, self.transform)
@@ -568,39 +570,39 @@ class ProcessImage(object):
         
         return grasp, grasp_img, grasp_points
 
-    def get_distance_to_camera(self, grasp=None, tomato_info=None):
+    # def get_distance_to_camera(self, grasp=None, tomato_info=None):
         
-        depth_image = self.depth
+    #     depth_image = self.depth
 
-        dx = grasp['full_size_image']['x'] - depth_image.shape[1]/2
-        dy = grasp['full_size_image']['y'] - depth_image.shape[0]/2
+    #     dx = grasp['full_size_image']['x'] - depth_image.shape[1]/2
+    #     dy = grasp['full_size_image']['y'] - depth_image.shape[0]/2
 
-        dx_in_mm = dx/self.px_per_mm
-        dy_in_mm = dy/self.px_per_mm
+    #     dx_in_mm = dx/self.px_per_mm
+    #     dy_in_mm = dy/self.px_per_mm
 
-        xy = grasp['full_size_image']['xy']
-        x = xy[0]
-        y = xy[1]
-        window_size = round(self.peduncle_width/2 * self.px_per_mm)
+    #     xy = grasp['full_size_image']['xy']
+    #     x = xy[0]
+    #     y = xy[1]
+    #     window_size = round(self.peduncle_width/2 * self.px_per_mm)
         
-        z_array = depth_image[x-window_size:x+window_size+1, y-window_size:y+window_size+1]
-        mean = np.average(z_array)
+    #     z_array = depth_image[x-window_size:x+window_size+1, y-window_size:y+window_size+1]
+    #     mean = np.average(z_array)
 
-        count = 0
-        _sum = 0
-        for i in range(len(z_array)):
-            for j in range(len(z_array[i])):
-                if abs(z_array[i][j] - mean) > 0.1*mean:
-                    continue
-                else:
-                    count += 1
-                    _sum += z_array[i][j]
+    #     count = 0
+    #     _sum = 0
+    #     for i in range(len(z_array)):
+    #         for j in range(len(z_array[i])):
+    #             if abs(z_array[i][j] - mean) > 0.1*mean:
+    #                 continue
+    #             else:
+    #                 count += 1
+    #                 _sum += z_array[i][j]
         
-        dz_in_mm = _sum/count
+    #     dz_in_mm = _sum/count
 
-        distance = {'dx': dx_in_mm, 'dy': dy_in_mm, 'dz': dz_in_mm}
+    #     distance = {'dx': dx_in_mm, 'dy': dy_in_mm, 'dz': dz_in_mm}
 
-        return distance
+    #     return distance
 
     def get_skeleton_img(self, img_shape, local=False):
         if local:
@@ -626,16 +628,10 @@ class ProcessImage(object):
         tomatoes = self.get_tomatoes()
         peduncle = self.get_peduncle()
         grasp_location, __, __ = self.get_grasp_points()
-
-        if self.depth is not None:
-            distance_to_camera = self.get_distance_to_camera(grasp=grasp_location, tomato_info=tomato_info)
-        else:
-            distance_to_camera = 'no data available'
         
         object_feature = {
             "tomato_info": tomato_info,
             "grasp_location": grasp_location,
-            "distance_to_camera[mm]": distance_to_camera,
             "tomato": tomatoes,
             "peduncle": peduncle
         }
@@ -826,7 +822,7 @@ class ProcessImage(object):
 
         self.color_space()
 
-        success = self.segment_image(save_segment=True)
+        success = self.segment_image(save_segment=False)
         if success is False:
             print("Failed to segment image")
             return success
@@ -868,34 +864,25 @@ class ProcessImage(object):
             for key_2 in settings[key_1]:
                 self.settings[key_1][key_2] = settings[key_1][key_2]
 
-@Timer("bounding_box_detection")
-def bounding_box_detection(pwd_root=None, tomato_size=None):
-    """
-    Bounding box detection
+    @Timer("bounding_box_detection")
+    def bounding_box_detection(self, rgb_data=None, tomato_size=None, pwd_model=None):
+        """
+        Bounding box detection
 
-    Output: saved bboxed images
-    """
-    
-    pwd_images = os.path.join(pwd_root, "data/bboxed_images/")
-    pwd_full_size_images = os.path.join(pwd_root, "data/images/")
-    pwd_detections = os.path.join(pwd_root, "results/bbox_detection/")
+        Output: saved bboxed images
+        """
+        inference_model = get_detection_model(pwd_model=pwd_model)
 
-    images_list = os.listdir(pwd_full_size_images)
-    images = [i for indx,i in enumerate(images_list) if images_list[indx][-4:] == '.png']
-    
-    images = images[:1]
-    inference_model = get_detection_model()
+        num_detections, bboxes_pred = predict_truss(rgb_data, 
+                                                    inference_model)
 
-    for count, file_name in enumerate(images):
-        print(f"Predicting trusses in image '{file_name}' ({count+1}/{len(images)})")
+        cropped_images, bboxes = create_bboxed_images(rgb_data, 
+                                                      bboxes_pred, 
+                                                      desired_size=510)
 
-        rgb_data = load_rgb(file_name, pwd=pwd_full_size_images, horizontal=True)
-        num_detections, bboxes_pred = predict_truss(rgb_data, inference_model, pwd_detections=pwd_detections, pwd_images=pwd_images, file_name=file_name)
+        return cropped_images, bboxes
 
-        generate_tomato_info(pwd_root=pwd_root, file_name=file_name, tomato_size=tomato_size, 
-                            num_detections=num_detections, bboxes=bboxes_pred, full_size_image_shape=rgb_data.shape[:2])
-
-def generate_tomato_info(pwd_root=None, file_name=None, tomato_size=None, num_detections=None, bboxes=None, full_size_image_shape=None):
+def generate_tomato_info(pwd_root=None, file_name=None, tomato_size=None, bboxes=None, full_size_image_shape=None):
     """
     Generates tomato_info json files for bboxed images
 
@@ -923,7 +910,7 @@ def generate_tomato_info(pwd_root=None, file_name=None, tomato_size=None, num_de
     avg_depth = find_mean_of_array(array)
     px_per_mm = find_px_per_mm(avg_depth, array.shape)
     
-    for i in range(num_detections):
+    for i in range(len(bboxes)):
         json_data = {'px_per_mm': px_per_mm,
                     'tomato_size': tomato_size,
                     'bbox': bboxes[i],
@@ -985,19 +972,6 @@ def main():
     tomato_size = 'small'
     drive = "backup"  # "UBUNTU 16_0"  #
 
-    path = Path(os.getcwd())
-
-    if bbox_detection:
-        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
-        bounding_box_detection(pwd_root=pwd_root, tomato_size=tomato_size)
-    else:
-        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
-
-    pwd_images = os.path.join(pwd_root, "data/bboxed_images")
-    pwd_json_read = os.path.join(pwd_root, "data/json")
-    pwd_results = os.path.join(pwd_root, "results/")
-    pwd_json_dump = os.path.join(pwd_results, 'json/')
-
     make_dirs(pwd_results)
     make_dirs(pwd_json_dump)
 
@@ -1005,6 +979,45 @@ def main():
                                  pwd=pwd_results,
                                  save=save,
                                  com_grasp=com_grasp)
+
+    path = Path(os.getcwd())
+
+    if bbox_detection:
+        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
+        pwd_images = os.path.join(pwd_root, "data/bboxed_images/")
+        pwd_full_size_images = os.path.join(pwd_root, "data/images/")
+        pwd_detections = os.path.join(pwd_root, "results/bbox_detection/")
+
+        model_dir = "bbox_detection/retinanet_465_imgs/"
+        pwd_model = os.path.join(pwd_root, model_dir)
+
+        images_list = os.listdir(pwd_full_size_images)
+        images = [i for indx,i in enumerate(images_list) if images_list[indx][-4:] == '.png']
+        
+        for count, file_name in enumerate(images):
+            print(f"Predicting trusses in image '{file_name}' ({count+1}/{len(images)})")
+            
+            rgb_data = load_rgb(file_name, pwd=pwd_full_size_images, horizontal=True)
+            cropped_images, bboxes = process_image.bounding_box_detection(rgb_data=rgb_data, 
+                                                                          tomato_size=tomato_size,
+                                                                          pwd_model=pwd_model)
+
+            for i in range(len(cropped_images)):
+                cropped_images[i].save(pwd_detections + file_name[:-4] + '_' + str(i) + '.png')
+            
+            generate_tomato_info(pwd_root=pwd_root, 
+                            file_name=file_name, 
+                            tomato_size=tomato_size, 
+                            bboxes=bboxes, 
+                            full_size_image_shape=rgb_data.shape[:2])
+    
+    else:
+        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
+
+    pwd_images = os.path.join(pwd_root, "data/bboxed_images")
+    pwd_json_read = os.path.join(pwd_root, "data/json")
+    pwd_results = os.path.join(pwd_root, "results/")
+    pwd_json_dump = os.path.join(pwd_results, 'json/')
     
     data = os.listdir(pwd_images)
     images = [i for indx,i in enumerate(data) if data[indx][-4:] == '.png']

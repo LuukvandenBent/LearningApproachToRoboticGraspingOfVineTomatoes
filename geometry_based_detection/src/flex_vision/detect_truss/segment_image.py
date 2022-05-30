@@ -222,7 +222,7 @@ def segment_truss(img_hue, img_a=None, img_sat=None, img_val=None, save="False",
 
     return background, tomato, peduncle
 
-def segment_truss_2(img_hsv, img_rgb, pwd = None, name = None, save=True):
+def segment_truss_2(img_hsv, img_rgb, pwd = None, name = None, save=False):
 
     # remove background with low saturation values
     lower_background = np.array([0,50,0])

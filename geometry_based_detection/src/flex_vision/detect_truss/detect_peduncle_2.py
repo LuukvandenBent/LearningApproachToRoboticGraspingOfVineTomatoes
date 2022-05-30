@@ -24,7 +24,7 @@ NEW_PATH_COLOUR = [130, 50, 230]
 JUNC_COLOR = (100, 0, 200)
 END_COLOR = (200, 0, 0)
 
-def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, save=False, save_skeleton=True, name="", pwd=""):
+def detect_peduncle(peduncle_img, settings=None, px_per_mm=None, bg_img=None, save=False, save_skeleton=False, name="", pwd=""):
     if settings is None:
         settings = settings.detect_peduncle()
 

@@ -83,6 +83,12 @@ It includes the 3D-models of the devices and is necessary for running launch fil
 
 > :warning: In case you run into issues with the camera install the SDK as explained [here](https://www.intelrealsense.com/sdk-2/) and select Linux.
 
+Launch RealSense
+
+```
+roslaunch realsense2_camera rs_rgbd.launch align_depth:=true depth_width:=1280 depth_height:=720 depth_fps:=30 color_width:=1280 color_height:=720 color_fps:=30
+```
+
 #### Graphical User Interface
 For fine-tuning parameters of the computer vision pipeline rqt_ez_publisher is used:
 ```

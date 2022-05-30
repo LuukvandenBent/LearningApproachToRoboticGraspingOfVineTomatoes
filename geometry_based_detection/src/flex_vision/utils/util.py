@@ -1109,3 +1109,38 @@ def find_px_per_mm(depth, image_shape, field_of_view=(69,42)):
     px_per_mm = (px_per_mm_x + px_per_mm_y)/2
 
     return px_per_mm
+
+def create_bboxed_images(image, bboxes_pred, desired_size=510):
+    image = Image.fromarray(image.astype('uint8'), 'RGB')
+    old_size = image.size
+
+    ratio = float(desired_size)/max(old_size)
+    black_bar_size = (desired_size - (min(old_size)*ratio))/2
+    
+    cropped_images = []
+    bboxes = []
+    
+    if old_size[0] < old_size[1]:
+        for i in range(len(bboxes_pred)):
+            x1 = int((bboxes_pred[i][0] - black_bar_size)/ratio)
+            x2 = int((bboxes_pred[i][2] - black_bar_size)/ratio)
+            y1 = int((bboxes_pred[i][1])/ratio)
+            y2 = int((bboxes_pred[i][3])/ratio)
+            
+            bbox = [x1,y1,x2,y2]
+            bboxes.append(bbox)
+            cropped_im = image.crop(bbox)
+            cropped_images.append(cropped_im)
+    else:
+        for i in range(len(bboxes_pred)):
+            y1 = int((bboxes_pred[i][1] - black_bar_size)/ratio)
+            y2 = int((bboxes_pred[i][3] - black_bar_size)/ratio)
+            x1 = int((bboxes_pred[i][0])/ratio)
+            x2 = int((bboxes_pred[i][2])/ratio)
+
+            bbox = [x1,y1,x2,y2]
+            bboxes.append(bbox)
+            cropped_im = image.crop(bbox)
+            cropped_images.append(cropped_im)
+
+    return cropped_images, bboxes

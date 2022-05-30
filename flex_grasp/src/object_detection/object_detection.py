@@ -12,6 +12,7 @@ import cv2
 import json
 import os
 from cv_bridge import CvBridge, CvBridgeError
+from pathlib import Path
 
 # msg
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
@@ -54,6 +55,7 @@ class ObjectDetection(object):
         self.depth_image = None
         self.camera_info = None
         self.pcl = None
+        self.tomato_info = None
 
         self.input_logger = self.initialize_input_logger()
         self.output_logger = self.initialize_output_logger()
@@ -184,20 +186,22 @@ class ObjectDetection(object):
     def save_data(self, result_img=None):
         """Save visual data"""
 
+        pwd = os.path.join(Path(self.experiment_info.path), self.experiment_info.id)
+
         # information about the image which will be stored
-        image_info = {'px_per_mm': self.compute_px_per_mm()}
-        json_pwd = os.path.join(self.experiment_info.path, self.experiment_info.id + '_info.json')
+        tomato_info = self.tomato_info
+        json_pwd = os.path.join(pwd, self.experiment_info.id + '_info.json')
 
         rgb_img = self.color_image
         depth_img = colored_depth_image(self.depth_image.copy())
 
         with open(json_pwd, "w") as write_file:
-            json.dump(image_info, write_file)
+            json.dump(tomato_info, write_file)
 
-        self.save_image(rgb_img, self.experiment_info.path,  name=self.experiment_info.id + '_rgb.png')
-        self.save_image(depth_img, self.experiment_info.path, name=self.experiment_info.id + '_depth.png')
+        self.save_image(rgb_img, pwd=pwd, name=self.experiment_info.id + '_rgb.png')
+        self.save_image(depth_img, pwd=pwd, name=self.experiment_info.id + '_depth.png')
         if result_img is not None:
-            self.save_image(result_img, self.experiment_info.path, name=self.experiment_info.id + '_result.png')
+            self.save_image(result_img, pwd=pwd, name=self.experiment_info.id + '_result.png')
 
         return FlexGraspErrorCodes.SUCCESS
 
@@ -227,9 +231,32 @@ class ObjectDetection(object):
             return success
 
         self.settings_logger.write_messages_to_bag({"settings": self.settings}, self.experiment_info.path, self.experiment_info.id)
-
+        
         px_per_mm = self.compute_px_per_mm()
-        self.process_image.add_image(self.color_image, px_per_mm=px_per_mm)
+
+        #TODO: read tomato_size from variable
+        self.tomato_info = {'px_per_mm': px_per_mm}
+        self.tomato_info['tomato_size'] = 'small'
+        self.tomato_info['full_size_image_shape'] = self.color_image.shape[:2]
+
+        detection_model_path = os.path.join(Path(self.experiment_info.path).parent.parent.parent, 'detection_model/retinanet_465_imgs/')
+        
+        cropped_images, bboxes = self.process_image.bounding_box_detection(rgb_data=np.array(self.color_image), 
+                                                                            tomato_size=self.tomato_info['tomato_size'],
+                                                                            pwd_model=detection_model_path)
+        rospy.logdebug(f'{len(cropped_images)} DETECTIONS')
+
+        if len(cropped_images) == 0:
+            rospy.logwarn("[OBJECT DETECTION] No object detected by RetinaNet")
+            return FlexGraspErrorCodes.NO_OBJECT_DETECTED
+
+        self.tomato_info['bbox'] = bboxes[0]
+        
+        self.color_image = np.array(cropped_images[0])
+        
+        self.process_image.add_image(self.color_image, 
+                                     tomato_info=self.tomato_info,
+                                     depth_data=self.depth_image)
 
         if self.settings is not None:
             self.process_image.set_settings(settings_msg_to_lib(self.settings))
@@ -239,7 +266,7 @@ class ObjectDetection(object):
             self.save_data()
             return FlexGraspErrorCodes.FAILURE
 
-        object_features = self.process_image.get_object_features()
+        object_features = self.process_image.get_object_features(tomato_info=self.tomato_info)
         tomato_mask, peduncle_mask, _ = self.process_image.get_segments()
         truss_visualization = self.process_image.get_truss_visualization(local=True)
         truss_visualization_total = self.process_image.get_truss_visualization(local=False)
@@ -257,14 +284,14 @@ class ObjectDetection(object):
         output_messages['depth_image'] = self.bridge.cv2_to_imgmsg(depth_img, encoding="rgb8")
         output_messages['tomato_image'] = self.bridge.cv2_to_imgmsg(truss_visualization, encoding="rgba8")
         output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
-        output_messages['truss_pose'] = self.generate_cage_pose(object_features['grasp_location'], peduncle_mask)
+        output_messages['truss_pose'] = self.generate_cage_pose(object_features['grasp_location']['full_size_image'], peduncle_mask)
 
         success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
         return success
 
     def generate_cage_pose(self, grasp_features, peduncle_mask):
-        row = grasp_features['row']
-        col = grasp_features['col']
+        row = grasp_features['x']
+        col = grasp_features['y']
         angle = grasp_features['angle']
         if angle is None:
             rospy.logwarn("Failed to compute caging pose: object detection returned None!")
@@ -283,7 +310,7 @@ class ObjectDetection(object):
         rospy.loginfo("[{0}] Depth based on assumptions: {1:0.3f} [m]".format(self.node_name, depth_assumption))
         rospy.loginfo("[{0}] Depth measured: {1:0.3f} [m]".format(self.node_name, depth_measured))
 
-        xyz = depth_image_filter.deproject(row, col, depth_assumption)
+        xyz = depth_image_filter.deproject(row, col, depth_measured)
 
         if np.isnan(xyz).any():
             rospy.logwarn("[{0}] Failed to compute caging pose, will try based on segment!".format(self.node_name))

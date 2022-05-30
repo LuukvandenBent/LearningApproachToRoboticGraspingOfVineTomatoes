@@ -5,7 +5,7 @@
 """
 
 def compute_grasp(grasp_length_min_px=30.0,
-                  grasp_length_min_mm=15.0,
+                  grasp_length_min_mm=15,
                   finger_thinkness_mm=10.0,
                   open_dist_mm=2*(0.037 - 0.0195)*1000):
 

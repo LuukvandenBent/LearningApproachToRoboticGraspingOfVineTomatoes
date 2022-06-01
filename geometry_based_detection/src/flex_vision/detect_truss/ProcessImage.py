@@ -541,15 +541,15 @@ class ProcessImage(object):
         if self.grasp_point is not None:
             [xy] = coords_from_points(self.grasp_point, frame_id)
             grasp_pixel = np.around(xy).astype(int)
-            x = grasp_pixel[1]
-            y = grasp_pixel[0]
+            x = grasp_pixel[0]
+            y = grasp_pixel[1]
 
             grasp = {'bboxed_image':{"xy": xy, "x": int(x), "y": int(y), "angle": angle}}
 
             if self.bbox_image is not None:
-                full_size_image_xy = [int(grasp_pixel[0] + self.bbox_image[1]), int(grasp_pixel[1] + self.bbox_image[0])]
-                full_size_image_x = full_size_image_xy[1]
-                full_size_image_y = full_size_image_xy[0]
+                full_size_image_xy = [int(grasp_pixel[0] + self.bbox_image[0]), int(grasp_pixel[1] + self.bbox_image[1])]
+                full_size_image_x = full_size_image_xy[0]
+                full_size_image_y = full_size_image_xy[1]
             
                 grasp['full_size_image'] = {"xy": full_size_image_xy, "x": full_size_image_x, "y": full_size_image_y, "angle": angle}
         

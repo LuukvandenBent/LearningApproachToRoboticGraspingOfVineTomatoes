@@ -56,6 +56,7 @@ class ObjectDetection(object):
         self.camera_info = None
         self.pcl = None
         self.tomato_info = None
+        self.color_image_bboxed = None
 
         self.input_logger = self.initialize_input_logger()
         self.output_logger = self.initialize_output_logger()
@@ -193,12 +194,14 @@ class ObjectDetection(object):
         json_pwd = os.path.join(pwd, self.experiment_info.id + '_info.json')
 
         rgb_img = self.color_image
+        rgb_img_bboxed = self.color_image_bboxed
         depth_img = colored_depth_image(self.depth_image.copy())
 
         with open(json_pwd, "w") as write_file:
             json.dump(tomato_info, write_file)
 
         self.save_image(rgb_img, pwd=pwd, name=self.experiment_info.id + '_rgb.png')
+        self.save_image(rgb_img_bboxed, pwd=pwd, name=self.experiment_info.id + '_rgb_bboxed.png')
         self.save_image(depth_img, pwd=pwd, name=self.experiment_info.id + '_depth.png')
         if result_img is not None:
             self.save_image(result_img, pwd=pwd, name=self.experiment_info.id + '_result.png')
@@ -241,20 +244,20 @@ class ObjectDetection(object):
 
         detection_model_path = os.path.join(Path(self.experiment_info.path).parent.parent.parent, 'detection_model/retinanet_465_imgs/')
         
-        cropped_images, bboxes = self.process_image.bounding_box_detection(rgb_data=np.array(self.color_image), 
+        bboxed_images, bboxes = self.process_image.bounding_box_detection(rgb_data=np.array(self.color_image), 
                                                                             tomato_size=self.tomato_info['tomato_size'],
                                                                             pwd_model=detection_model_path)
-        rospy.logdebug(f'{len(cropped_images)} DETECTIONS')
+        rospy.logdebug(f'{len(bboxed_images)} DETECTIONS')
 
-        if len(cropped_images) == 0:
-            rospy.logwarn("[OBJECT DETECTION] No object detected by RetinaNet")
+        if len(bboxed_images) == 0:
+            rospy.loginfo("[OBJECT DETECTION] No object detected by RetinaNet")
             return FlexGraspErrorCodes.NO_OBJECT_DETECTED
 
         self.tomato_info['bbox'] = bboxes[0]
         
-        self.color_image = np.array(cropped_images[0])
+        self.color_image_bboxed = np.array(bboxed_images[0])
         
-        self.process_image.add_image(self.color_image, 
+        self.process_image.add_image(self.color_image_bboxed, 
                                      tomato_info=self.tomato_info,
                                      depth_data=self.depth_image)
 
@@ -290,8 +293,8 @@ class ObjectDetection(object):
         return success
 
     def generate_cage_pose(self, grasp_features, peduncle_mask):
-        row = grasp_features['x']
-        col = grasp_features['y']
+        row = grasp_features['y']
+        col = grasp_features['x']
         angle = grasp_features['angle']
         if angle is None:
             rospy.logwarn("Failed to compute caging pose: object detection returned None!")
@@ -309,8 +312,25 @@ class ObjectDetection(object):
         # location
         rospy.loginfo("[{0}] Depth based on assumptions: {1:0.3f} [m]".format(self.node_name, depth_assumption))
         rospy.loginfo("[{0}] Depth measured: {1:0.3f} [m]".format(self.node_name, depth_measured))
+        
+        action = input("Do you want to approach or grasp? (approach=0, grasp=1)")
+        
+        if action == '0':
+            action = 'approach'
+        elif action == '1':
+            action = 'grasp'
+        else:
+            rospy.loginfo('Input not valid, choosing "approach"')
+            action = 'approach'
 
-        xyz = depth_image_filter.deproject(row, col, depth_measured)
+        rospy.loginfo(f'Determining coordinates to {action} object')
+        
+        if action == 'approach':
+            depth = depth_measured - 0.3    # 300 mm above object
+        elif action == 'grasp':
+            depth = depth_measured
+
+        xyz = depth_image_filter.deproject(row, col, depth)
 
         if np.isnan(xyz).any():
             rospy.logwarn("[{0}] Failed to compute caging pose, will try based on segment!".format(self.node_name))
@@ -377,3 +397,4 @@ class ObjectDetection(object):
         self.depth_image = None
         self.camera_info = None
         self.pcl = None
+        self.color_image_bboxed = None

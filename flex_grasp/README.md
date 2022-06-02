@@ -58,10 +58,11 @@ git clone https://github.com/IFL-CAMP/iiwa_stack
 ```
 
 #### Calibration
-For calibration easy_handeye is used:
+For calibration easy_handeye is used and aruco_ros is needed:
 ```
 cd ~/flexcraft_ws/src
 git clone https://github.com/IFL-CAMP/easy_handeye.git
+git clone https://github.com/pal-robotics/aruco_ros
 ```
 
 #### Intel Realsense

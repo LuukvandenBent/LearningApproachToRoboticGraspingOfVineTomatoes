@@ -3,7 +3,7 @@
 import rospy
 
 from state_machine.state_machine_input import StateMachineInput
-from state_machine.planner_state_machine import PlannerStateMachine
+from state_machine.plan_movement_state_machine import PlannerStateMachine
 from plan_movement import Planner
 
 NODE_NAME = 'plan_movement'

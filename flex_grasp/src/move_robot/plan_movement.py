@@ -62,7 +62,7 @@ class Planner():
                                 data.rotation.z, data.rotation.w])
         self.to_frame = data.frame_id
 
-    def plan_movement(self, movement='approach'):
+    def plan_movement(self, movement=None):
         
         goal = self.find_goal_pose(movement=movement)
         
@@ -73,14 +73,32 @@ class Planner():
         return FlexGraspErrorCodes.SUCCESS
 
     def find_goal_pose(self, movement=None):
-        _goal = np.array([self.current_pos[0] + self.delta_pos[0], self.current_pos[1] + self.delta_pos[1], self.current_pos[2] + self.delta_pos[2]])
-        goal_orientation = self.current_ori
-
         if movement == 'approach':
-            _goal[2] = _goal[2] + 0.3
+            self.delta_pos[2] = 0
 
         elif movement == 'grasp':
-            _goal[2] = _goal[2] + 0.25
+            self.delta_pos[2] = -0.05
+
+        elif movement == 'move_right':
+            self.delta_pos = np.array([0.0,0.05,0.0])
+
+        elif movement == 'move_left':
+            self.delta_pos = np.array([0.0,-0.05,0.0])
+        
+        elif movement == 'move_forwards':
+            self.delta_pos = np.array([0.05,0.0,0.0])
+
+        elif movement == 'move_backwards':
+            self.delta_pos = np.array([-0.05,0.0,0.0])
+
+        elif movement == 'move_upwards':
+            self.delta_pos = np.array([0.0,0.0,0.05])
+
+        elif movement == 'move_downwards':
+            self.delta_pos = np.array([0.0,0.0,-0.05])
+
+        _goal = np.array([self.current_pos[0] + self.delta_pos[0], self.current_pos[1] + self.delta_pos[1], self.current_pos[2] + self.delta_pos[2]])
+        goal_orientation = self.current_ori
 
         goal = PoseStamped()
         

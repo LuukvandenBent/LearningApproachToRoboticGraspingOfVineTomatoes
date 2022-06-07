@@ -12,6 +12,10 @@ class PlannerStateMachine(object):
         self._is_idle = True
         self._command = None
         self._shutdown_requested = False
+        self.possible_commands = ['approach', 'grasp', 
+                                'move_right', 'move_left',
+                                'move_forwards', 'move_backwards',
+                                'move_upwards', 'move_downwards']
 
     def run(self):
         rate = rospy.Rate(self._update_rate)
@@ -29,16 +33,11 @@ class PlannerStateMachine(object):
 
     def _process_idle_state(self):
         command = self._input.command
-
+        
         if command is None:
             return
 
-        elif command == "approach":
-            self._is_idle = False
-            self.command = command
-            self._input.command_accepted()
-
-        elif command == "grasp":
+        elif command in self.possible_commands:
             self._is_idle = False
             self.command = command
             self._input.command_accepted()
@@ -51,13 +50,8 @@ class PlannerStateMachine(object):
             self._input.command_rejected()
 
     def _process_plan_state(self):
-        if self.command == "approach":
-            if self._planner.wait_for_messages():
-                result = self._planner.plan_movement(movement=self.command)
-            else:
-                result = FlexGraspErrorCodes.REQUIRED_DATA_MISSING
-
-        elif self.command == "grasp":
+        
+        if self.command in self.possible_commands:
             if self._planner.wait_for_messages():
                 result = self._planner.plan_movement(movement=self.command)
             else:

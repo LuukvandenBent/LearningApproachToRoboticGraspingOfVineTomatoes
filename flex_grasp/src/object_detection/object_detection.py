@@ -289,8 +289,6 @@ class ObjectDetection(object):
         output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
         output_messages['truss_pose'] = self.generate_cage_pose(object_features['grasp_location']['full_size_image'], peduncle_mask)
 
-        rospy.loginfo(f"[{self.node_name}] truss_pose: {output_messages['truss_pose']}")
-
         success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
         return success
 

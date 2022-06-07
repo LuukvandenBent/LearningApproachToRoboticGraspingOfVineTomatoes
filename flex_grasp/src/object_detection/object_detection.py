@@ -67,7 +67,7 @@ class ObjectDetection(object):
 
         # params
         self.patch_size = 5
-        self.peduncle_height = 0.080  # [m]
+        self.peduncle_height = 0.045  # [m]
         self.settings = settings_lib_to_msg(self.process_image.get_settings())
 
         self.experiment_info = ExperimentInfo(self.node_name)
@@ -250,7 +250,7 @@ class ObjectDetection(object):
         rospy.logdebug(f'{len(bboxed_images)} DETECTIONS')
 
         if len(bboxed_images) == 0:
-            rospy.loginfo("[OBJECT DETECTION] No object detected by RetinaNet")
+            rospy.loginfo(f"[{self.node_name}] No object detected by RetinaNet")
             return FlexGraspErrorCodes.NO_OBJECT_DETECTED
 
         self.tomato_info['bbox'] = bboxes[0]
@@ -265,7 +265,7 @@ class ObjectDetection(object):
             self.process_image.set_settings(settings_msg_to_lib(self.settings))
 
         if not self.process_image.process_image():
-            rospy.logwarn("[OBJECT DETECTION] Failed to process image")
+            rospy.logwarn(f"[{self.node_name}] Failed to process image")
             self.save_data()
             return FlexGraspErrorCodes.FAILURE
 
@@ -289,6 +289,8 @@ class ObjectDetection(object):
         output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
         output_messages['truss_pose'] = self.generate_cage_pose(object_features['grasp_location']['full_size_image'], peduncle_mask)
 
+        rospy.loginfo(f"[{self.node_name}] truss_pose: {output_messages['truss_pose']}")
+
         success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
         return success
 
@@ -306,29 +308,21 @@ class ObjectDetection(object):
 
         rs_intrinsics = camera_info2rs_intrinsics(self.camera_info)
         depth_image_filter = DepthImageFilter(self.depth_image, rs_intrinsics, patch_size=5, node_name=self.node_name)
-        depth_assumption = self.get_table_height() - self.peduncle_height
-        depth_measured = depth_image_filter.get_depth(row, col)
+        table_height = round(self.get_table_height(),3)
+        depth_assumption = round(table_height - self.peduncle_height, 3)
+        depth_measured = round(depth_image_filter.get_depth(row, col), 3)
 
         # location
-        rospy.loginfo("[{0}] Depth based on assumptions: {1:0.3f} [m]".format(self.node_name, depth_assumption))
-        rospy.loginfo("[{0}] Depth measured: {1:0.3f} [m]".format(self.node_name, depth_measured))
+        rospy.loginfo(f'[{self.node_name}] Table height: {table_height}')
+        rospy.loginfo(f'[{self.node_name}] Depth based on assumptions: {depth_assumption}')
+        rospy.loginfo(f'[{self.node_name}] Depth measured: {depth_measured}')
         
-        action = input("Do you want to approach or grasp? (approach=0, grasp=1)")
+        if table_height < depth_measured + 0.02: #2cm margin
+            rospy.logwarn(f'[{self.node_name}] Measured depth ({depth_measured}m) is too low (table height={table_height}m)')
+            return FlexGraspErrorCodes.DEPTH_TOO_LOW
         
-        if action == '0':
-            action = 'approach'
-        elif action == '1':
-            action = 'grasp'
-        else:
-            rospy.loginfo('Input not valid, choosing "approach"')
-            action = 'approach'
-
-        rospy.loginfo(f'Determining coordinates to {action} object')
-        
-        if action == 'approach':
-            depth = depth_measured - 0.3    # 300 mm above object
-        elif action == 'grasp':
-            depth = depth_measured
+        # temporary because RealSense has issues
+        depth = 0.27
 
         xyz = depth_image_filter.deproject(row, col, depth)
 

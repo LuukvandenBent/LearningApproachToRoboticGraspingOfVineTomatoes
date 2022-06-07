@@ -29,3 +29,6 @@ int32 DYNAMIXEL_SEVERE_ERROR = 401
 
 # object detection error
 int32 NO_OBJECT_DETECTED = 500
+
+# checks
+int32 DEPTH_TOO_LOW = 600

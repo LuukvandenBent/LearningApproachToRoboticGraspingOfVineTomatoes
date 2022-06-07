@@ -107,7 +107,7 @@ def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=Non
     best_length = 0
 
     # min distance to junction/end_coord 
-    threshold = 7
+    threshold = 3
 
     junc_coords = None
     for i in range(len(junc_nodes)):

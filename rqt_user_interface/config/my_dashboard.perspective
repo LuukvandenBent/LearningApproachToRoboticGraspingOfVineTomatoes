@@ -1,0 +1,990 @@
+{
+  "keys": {},
+  "groups": {
+    "pluginmanager": {
+      "keys": {
+        "running-plugins": {
+          "type": "repr",
+          "repr": "{u'rqt_ez_publisher/EzPublisher': [1], u'rqt_image_view/ImageView': [6, 2, 1], u'rqt_user_interface/Flex Grasp': [1], u'rqt_console/Console': [1]}"
+        }
+      },
+      "groups": {
+        "plugin____DockWidgetContainer__1": {
+          "keys": {},
+          "groups": {
+            "dock_widget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Container'"
+                }
+              },
+              "groups": {
+                "mainwindow": {
+                  "keys": {
+                    "geometry": {
+                      "type": "repr(QByteArray.hex)",
+                      "repr(QByteArray.hex)": "b'01d9d0cb0002000000000000000000150000017c000002c50000000000000000ffffffffffffffff00000001000000000780'",
+                      "pretty-print": "         |               "
+                    },
+                    "state": {
+                      "type": "repr(QByteArray.hex)",
+                      "repr(QByteArray.hex)": "b'000000ff00000000fd00000000000000000000000000000004000000040000000800000008fc00000000'",
+                      "pretty-print": "                     "
+                    }
+                  },
+                  "groups": {}
+                }
+              }
+            }
+          }
+        },
+        "plugin__rqt_image_view__ImageView__6": {
+          "keys": {},
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Image View (6)'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "max_range": {
+                  "type": "repr",
+                  "repr": "10.0"
+                },
+                "rotate": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "smooth_image": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "mouse_pub_topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/camera/depth/image_rect_raw_mouse_left'"
+                },
+                "num_gridlines": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "toolbar_hidden": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "zoom1": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "dynamic_range": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/camera/depth/image_rect_raw'"
+                },
+                "publish_click_location": {
+                  "type": "repr",
+                  "repr": "False"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_image_view__ImageView__4": {
+          "keys": {},
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Image View (4)'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "max_range": {
+                  "type": "repr",
+                  "repr": "10.0"
+                },
+                "rotate": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "smooth_image": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "mouse_pub_topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/color_A_mouse_left'"
+                },
+                "num_gridlines": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "toolbar_hidden": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "zoom1": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "dynamic_range": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/color_A'"
+                },
+                "publish_click_location": {
+                  "type": "repr",
+                  "repr": "False"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_image_view__ImageView__5": {
+          "keys": {},
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Image View (5)'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "max_range": {
+                  "type": "repr",
+                  "repr": "10.0"
+                },
+                "rotate": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "smooth_image": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "mouse_pub_topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/segment_image_mouse_left'"
+                },
+                "num_gridlines": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "toolbar_hidden": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "zoom1": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "dynamic_range": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/segment_image'"
+                },
+                "publish_click_location": {
+                  "type": "repr",
+                  "repr": "False"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_image_view__ImageView__2": {
+          "keys": {},
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Image View (2)'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "max_range": {
+                  "type": "repr",
+                  "repr": "10.0"
+                },
+                "rotate": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "smooth_image": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "mouse_pub_topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/tomato_image_total_mouse_left'"
+                },
+                "num_gridlines": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "toolbar_hidden": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "zoom1": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "dynamic_range": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/tomato_image_total'"
+                },
+                "publish_click_location": {
+                  "type": "repr",
+                  "repr": "False"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_image_view__ImageView__3": {
+          "keys": {},
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Image View (3)'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "max_range": {
+                  "type": "repr",
+                  "repr": "10.0"
+                },
+                "rotate": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "smooth_image": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "mouse_pub_topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/color_saturation_mouse_left'"
+                },
+                "num_gridlines": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "toolbar_hidden": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "zoom1": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "dynamic_range": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/color_saturation'"
+                },
+                "publish_click_location": {
+                  "type": "repr",
+                  "repr": "False"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_image_view__ImageView__1": {
+          "keys": {},
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Image View'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "max_range": {
+                  "type": "repr",
+                  "repr": "10.0"
+                },
+                "rotate": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "smooth_image": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "mouse_pub_topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/aruco_tracker/result_mouse_left'"
+                },
+                "num_gridlines": {
+                  "type": "repr",
+                  "repr": "0"
+                },
+                "toolbar_hidden": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "zoom1": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "dynamic_range": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "topic": {
+                  "type": "repr",
+                  "repr": "u'/px150/aruco_tracker/result'"
+                },
+                "publish_click_location": {
+                  "type": "repr",
+                  "repr": "False"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_rviz__RViz__1": {
+          "keys": {},
+          "groups": {
+            "plugin": {
+              "keys": {
+                "rviz_config_file": {
+                  "type": "repr",
+                  "repr": "u''"
+                },
+                "hide_menu": {
+                  "type": "repr",
+                  "repr": "False"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_launch__Launch__1": {
+          "keys": {},
+          "groups": {
+            "plugin": {
+              "keys": {
+                "_splitter": {
+                  "type": "repr(QByteArray.hex)",
+                  "repr(QByteArray.hex)": "b'000000ff000000010000000200000064000000640100000009010000000200'",
+                  "pretty-print": "       d d     "
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_user_interface__Flex Grasp__1": {
+          "keys": {},
+          "groups": {
+            "dock_widget__RqtFlexGraspUi": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Grasp UI'"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_topic__TopicPlugin__1": {
+          "keys": {},
+          "groups": {
+            "plugin": {
+              "keys": {
+                "tree_widget_header_state": {
+                  "type": "repr(QByteArray.hex)",
+                  "repr(QByteArray.hex)": "b'000000ff0000000000000001000000000000000001000000000000000000000000000000000000065d000000050101000100000000000000000500000064ffffffff000000810000000300000005000003e100000001000000030000016900000001000000030000007200000001000000030000003d0000000100000003000000640000000100000003000003e800'",
+                  "pretty-print": "                              d               i     r     =     d      "
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_launchtree__Launch Tree__1": {
+          "keys": {},
+          "groups": {
+            "dock_widget__LaunchtreeWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "u'true'"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'LaunchtreeWidget'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "last_launch": {
+                  "type": "repr",
+                  "repr": "u'launch/interbotix_enviroment.launch'"
+                },
+                "last_pkg": {
+                  "type": "repr",
+                  "repr": "u'flex_grasp'"
+                },
+                "editor": {
+                  "type": "repr",
+                  "repr": "u'gedit'"
+                },
+                "last_args": {
+                  "type": "repr",
+                  "repr": "u''"
+                }
+              },
+              "groups": {}
+            }
+          }
+        },
+        "plugin__rqt_ez_publisher__EzPublisher__1": {
+          "keys": {},
+          "groups": {
+            "dock_widget__EzPublisherPluginUi": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u''"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "texts": {
+                  "type": "repr",
+                  "repr": "[u'/px150/image_processing_settings/tomato_radius_min_mm', u'/px150/image_processing_settings/tomato_radius_max_mm', u'/px150/image_processing_settings/param1', u'/px150/image_processing_settings/param2', u'/px150/image_processing_settings/branch_length_min_mm', u'/px150/image_processing_settings/grasp_length_min_mm']"
+                },
+                "publish_interval": {
+                  "type": "repr",
+                  "repr": "100"
+                },
+                "configurable": {
+                  "type": "repr",
+                  "repr": "True"
+                }
+              },
+              "groups": {
+                "px150": {
+                  "keys": {},
+                  "groups": {
+                    "image_processing_settings": {
+                      "keys": {
+                        "tomato_radius_min_mm_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "tomato_radius_min_mm_range": {
+                          "type": "repr",
+                          "repr": "(0, 100)"
+                        },
+                        "grasp_length_min_mm_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "tomato_radius_max_mm_range": {
+                          "type": "repr",
+                          "repr": "(0, 100)"
+                        },
+                        "tomato_radius_max_mm_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "param2_range": {
+                          "type": "repr",
+                          "repr": "(0, 100)"
+                        },
+                        "branch_length_min_mm_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "dp_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "param1_range": {
+                          "type": "repr",
+                          "repr": "(0, 100)"
+                        },
+                        "tomato_distance_min_mm_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "dp_range": {
+                          "type": "repr",
+                          "repr": "(0, 100)"
+                        },
+                        "param1_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "grasp_length_min_mm_range": {
+                          "type": "repr",
+                          "repr": "(0, 100)"
+                        },
+                        "tomato_distance_min_mm_range": {
+                          "type": "repr",
+                          "repr": "(1, 100)"
+                        },
+                        "param2_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "ratio_threshold_range": {
+                          "type": "repr",
+                          "repr": "(0.0, 1.0)"
+                        },
+                        "ratio_threshold_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        },
+                        "branch_length_min_mm_range": {
+                          "type": "repr",
+                          "repr": "(0, 100)"
+                        }
+                      },
+                      "groups": {
+                        "param1": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(1, 99)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "branch_length_min_mm": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(0, 10)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "tomato_radius_max_mm": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(0, 50)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "tomato_distance_min_mm": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(0, 50)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "tomato_radius_min_mm": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(0, 50)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "tomato_radius_max": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(1, 10)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "param2": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(1, 199)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "tomato_distance_min": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(1, 10)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "dp": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(1, 10)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        },
+                        "tomato_radius_min": {
+                          "keys": {
+                            "data_range": {
+                              "type": "repr",
+                              "repr": "(1, 10)"
+                            },
+                            "data_is_repeat": {
+                              "type": "repr",
+                              "repr": "False"
+                            }
+                          },
+                          "groups": {}
+                        }
+                      }
+                    },
+                    "tomato_radius_max": {
+                      "keys": {
+                        "data_range": {
+                          "type": "repr",
+                          "repr": "(1, 10)"
+                        },
+                        "data_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        }
+                      },
+                      "groups": {}
+                    },
+                    "peduncle_height": {
+                      "keys": {
+                        "data_range": {
+                          "type": "repr",
+                          "repr": "(0.0, 0.2)"
+                        },
+                        "data_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        }
+                      },
+                      "groups": {}
+                    },
+                    "dataset": {
+                      "keys": {
+                        "data_range": {
+                          "type": "repr",
+                          "repr": "(0, 0)"
+                        },
+                        "data_is_repeat": {
+                          "type": "repr",
+                          "repr": "False"
+                        }
+                      },
+                      "groups": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "plugin__rqt_console__Console__1": {
+          "keys": {},
+          "groups": {
+            "dock_widget__ConsoleWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "parent": {
+                  "type": "repr",
+                  "repr": "None"
+                },
+                "dock_widget_title": {
+                  "type": "repr",
+                  "repr": "u'Console'"
+                }
+              },
+              "groups": {}
+            },
+            "plugin": {
+              "keys": {
+                "show_highlighted_only": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "message_limit": {
+                  "type": "repr",
+                  "repr": "20000"
+                },
+                "exclude_filters": {
+                  "type": "repr",
+                  "repr": "[u'severity', u'node']"
+                },
+                "table_splitter": {
+                  "type": "repr(QByteArray.hex)",
+                  "repr(QByteArray.hex)": "b'000000ff00000001000000020000024d000001760100000009010000000200'",
+                  "pretty-print": "       M v     "
+                },
+                "highlight_filters": {
+                  "type": "repr",
+                  "repr": "u'message'"
+                },
+                "paused": {
+                  "type": "repr",
+                  "repr": "False"
+                },
+                "settings_exist": {
+                  "type": "repr",
+                  "repr": "True"
+                },
+                "filter_splitter": {
+                  "type": "repr(QByteArray.hex)",
+                  "repr(QByteArray.hex)": "b'000000ff00000001000000020000008d000000720100000009010000000200'",
+                  "pretty-print": "         r     "
+                }
+              },
+              "groups": {
+                "exclude_filter_0": {
+                  "keys": {
+                    "enabled": {
+                      "type": "repr",
+                      "repr": "True"
+                    },
+                    "itemlist": {
+                      "type": "repr",
+                      "repr": "u''"
+                    }
+                  },
+                  "groups": {}
+                },
+                "exclude_filter_1": {
+                  "keys": {
+                    "enabled": {
+                      "type": "repr",
+                      "repr": "True"
+                    },
+                    "itemlist": {
+                      "type": "repr",
+                      "repr": "u'/px150/move_group'"
+                    }
+                  },
+                  "groups": {}
+                },
+                "highlight_filter_0": {
+                  "keys": {
+                    "regex": {
+                      "type": "repr",
+                      "repr": "False"
+                    },
+                    "text": {
+                      "type": "repr",
+                      "repr": "u''"
+                    },
+                    "enabled": {
+                      "type": "repr",
+                      "repr": "True"
+                    }
+                  },
+                  "groups": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "mainwindow": {
+      "keys": {
+        "geometry": {
+          "type": "repr(QByteArray.hex)",
+          "repr(QByteArray.hex)": "b'01d9d0cb00020000000000430000001b0000077f0000043700000043000000370000077f0000043700000000000000000780'",
+          "pretty-print": "     C     7 C 7   7     "
+        },
+        "state": {
+          "type": "repr(QByteArray.hex)",
+          "repr(QByteArray.hex)": "b'000000ff00000000fd00000001000000030000073d000003d5fc0100000005fc000000000000073d0000051100fffffffc0200000005fc00000000000001610000000000fffffffa000000000200000002fb00000060007200710074005f006c00610075006e006300680074007200650065005f005f004c00610075006e0063006800200054007200650065005f005f0031005f005f004c00610075006e0063006800740072006500650057006900640067006500740100000000ffffffff0000000000000000fb0000005e007200710074005f0075007300650072005f0069006e0074006500720066006100630065005f005f005300440048002000470072006100730070005f005f0031005f005f005200710074005300640068004700720061007300700055006901000000000000040a0000000000000000fb00000060007200710074005f0075007300650072005f0069006e0074006500720066006100630065005f005f0046006c00650078002000470072006100730070005f005f0031005f005f00520071007400530064006800470072006100730070005500690100000000000000a50000000000000000fb0000006a007200710074005f0065007a005f007000750062006c00690073006800650072005f005f0045007a005000750062006c00690073006800650072005f005f0031005f005f0045007a005000750062006c006900730068006500720050006c007500670069006e0055006901000000160000016c0000016c00fffffffc00000188000002630000017800fffffffc0100000003fc000000000000019c0000018500fffffffc0200000002fb00000062007200710074005f0075007300650072005f0069006e0074006500720066006100630065005f005f0046006c00650078002000470072006100730070005f005f0031005f005f0052007100740046006c006500780047007200610073007000550069010000018800000110000000fa00fffffffb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0031005f005f0049006d0061006700650056006900650077005700690064006700650074010000029e0000014d0000005100fffffffc000001a2000002a8000000dd00fffffffa000000000200000005fb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0032005f005f0049006d00610067006500560069006500770057006900640067006500740100000000ffffffff0000005100fffffffb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0036005f005f0049006d00610067006500560069006500770057006900640067006500740100000000ffffffff0000005100fffffffb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0035005f005f0049006d00610067006500560069006500770057006900640067006500740100000000ffffffff0000000000000000fb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0033005f005f0049006d00610067006500560069006500770057006900640067006500740100000000ffffffff0000000000000000fb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0034005f005f0049006d00610067006500560069006500770057006900640067006500740100000100000000b20000000000000000fb0000004c007200710074005f0063006f006e0073006f006c0065005f005f0043006f006e0073006f006c0065005f005f0031005f005f0043006f006e0073006f006c00650057006900640067006500740100000450000002ed000001ae00fffffffb00000030005f005f0044006f0063006b0057006900640067006500740043006f006e007400610069006e00650072005f005f003103000007800000015c0000017d000002c6fb0000004c007200710074005f0074006f007000690063005f005f0054006f0070006900630050006c007500670069006e005f005f0031005f005f0054006f00700069006300570069006400670065007401000003b9000003860000000000000000fb00000050007200710074005f0070006f00730065005f0076006900650077005f005f0050006f007300650056006900650077005f005f0031005f005f0047004c005600690065007700570069006400670065007401000000000000073f0000000000000000fb00000064007200710074005f006c00610075006e00630068005f005f004c00610075006e00630068005f005f0031005f005f005f0070006c007500670069006e0063006f006e007400610069006e00650072005f0074006f0070005f00770069006400670065007401000002d6000001500000000000000000fb00000026007200710074005f007200760069007a005f005f005200560069007a005f005f0031005f005f01000004800000030000000000000000000000073d0000000000000004000000040000000800000008fc00000001000000030000000100000036004d0069006e0069006d0069007a006500640044006f0063006b00570069006400670065007400730054006f006f006c0062006100720000000000ffffffff0000000000000000'",
+          "pretty-print": "                   =                      `rqt_launchtree__Launch Tree__1__LaunchtreeWidget          ^rqt_user_interface__SDH Grasp__1__RqtSdhGraspUi          `rqt_user_interface__Flex Grasp__1__RqtSdhGraspUi          jrqt_ez_publisher__EzPublisher__1__EzPublisherPluginUi            c x                  brqt_user_interface__Flex Grasp__1__RqtFlexGraspUi          Zrqt_image_view__ImageView__1__ImageViewWidget                                                                           Q                                                       Q                                                                                                                                                                                                                    P                                    \\ }                                                                                                 ?                                                            P                                   =                                                      "
+        }
+      },
+      "groups": {
+        "toolbar_areas": {
+          "keys": {
+            "MinimizedDockWidgetsToolbar": {
+              "type": "repr",
+              "repr": "8"
+            }
+          },
+          "groups": {}
+        }
+      }
+    }
+  }
+}

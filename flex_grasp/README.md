@@ -205,7 +205,39 @@ To activate an action, a command needs to be published on the `ROBOT_NAME/pipeli
 With the drop down menu you can select where to store the results.
 
 
-## 3 Supported hardware
+## 3 Working with Panda Franka Emika
+
+### How to start the impedance controller
+roslaunch franka_example_controllers cartesian_impedance_example_controller.launch robot_ip:=<robot_ip> load_gripper:=True
+
+For example, <robot_ip>=172.16.0.2
+
+### How to read the current position and orientation of the end-effector?
+rostopic echo /cartesian_pose
+
+### How to connect your PC to the network and read and send commands to the controller.
+
+1. Connect your PC to the network
+2. Create a new wired network and in IPv4 set Manual and put a new ip for your computer <pc_ip>=A.B.C.F where F is different from the <computer_ip> or the <robot_ip>. Netmask is the same 255.255.255.0. Save the network. 
+3. Add this to your bash file (gedit ~/.bashrc): 
+```
+export ROS_MASTER_URI=http://<computer_ip>:11311 
+export ROS_IP=<pc_ip> 
+export ROS_HOSTNAME=<pc_ip>
+```
+(this can give issues when launching the camera for example, an alternative is to do these exports only in the needed terminal windows)
+4. source /opt/ros/<ros_version>/setup.bash
+5. Test the data_streaming with rostopic list
+
+### How to control the gripper
+```
+rosrun franka_human_friendly_controllers franka_gripper_online
+```
+To change the width of the gripper you can publish rostopic pub /gripper_online msgs/Float32 "data: 0.01"
+in the data you can specify your desired gripper width in meters.
+
+
+## 4 Supported hardware
 
 Manipulator:
 
@@ -221,7 +253,7 @@ Carmera:
 - **Intel RealSense D435**
 
 
-## 4 Contents
+## 5 Contents
 
 ### Nodes
 
@@ -256,7 +288,7 @@ To store the state of different parts of the system, enums are used. These are d
 
 All nodes run in the `robot_name` namespace to allow for multiple robots present
 
-## 5 Trouble shooting
+## 6 Trouble shooting
 
 ### libcurl: (51) SSL: no alternative certificate subject name matches target host name ‘api.ignitionfuel.org’
 https://varhowto.com/how-to-fix-libcurl-51-ssl-no-alternative-certificate-subject-name-matches-target-host-name-api-ignitionfuel-org-gazebo-ubuntu-ros-melodic/

@@ -226,6 +226,7 @@ export ROS_IP=<pc_ip>
 export ROS_HOSTNAME=<pc_ip>
 ```
 (this can give issues when launching the camera for example, an alternative is to do these exports only in the needed terminal windows)
+
 4. source /opt/ros/<ros_version>/setup.bash
 5. Test the data_streaming with rostopic list
 

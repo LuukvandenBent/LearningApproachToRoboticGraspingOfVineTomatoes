@@ -15,7 +15,9 @@ class PlannerStateMachine(object):
         self.possible_commands = ['approach', 'grasp', 
                                 'move_right', 'move_left',
                                 'move_forwards', 'move_backwards',
-                                'move_upwards', 'move_downwards']
+                                'move_upwards', 'move_downwards',
+                                'calibration_movement',
+                                'home']
 
     def run(self):
         rate = rospy.Rate(self._update_rate)
@@ -50,9 +52,8 @@ class PlannerStateMachine(object):
             self._input.command_rejected()
 
     def _process_plan_state(self):
-        
         if self.command in self.possible_commands:
-            if self._planner.wait_for_messages():
+            if self._planner.wait_for_messages(command=self.command):
                 result = self._planner.plan_movement(movement=self.command)
             else:
                 result = FlexGraspErrorCodes.REQUIRED_DATA_MISSING

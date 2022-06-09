@@ -5,9 +5,27 @@
 	<arg name="gui_start_delay"			default="8"/>
   	
 	  <!-- debug settings -->
-	<arg name="pipeline_debug"			default="false"/>
-	<arg name="object_detection_debug"	default="true"/>
+	<arg name="pipeline_debug"				default="false"/>
+	<arg name="object_detection_debug"		default="true"/>
 	<arg name="plan_movement_debug"			default="true"/>
+	<arg name="calibrate_debug" 			default="true"/>
+
+	<!-- Parameters to pass to the ROS node -->
+	<arg name="robot_name" 					default="panda"/>
+	<arg name="manipulator_group_name" 		default="manipulator"/>
+	<arg name="ee_group_name"           	default="gripper"/>
+	<arg name="planning_frame" 				default="world"/> 
+	<arg name="robot_base_frame" 			default="panda/base_link"/>
+
+	<include file="$(find flex_calibrate)/launch/calibrate.launch">
+		<arg name="calibrate_debug" value="$(arg calibrate_debug)"/>
+		<arg name="start_rviz" value="false"/>
+		<arg name="start_independent" value="false"/>
+
+		<arg name="robot_name" value="$(arg robot_name)"/>
+		<arg name="manipulator_group_name" value="$(arg manipulator_group_name)"/>
+		<arg name="ee_group_name" value="$(arg ee_group_name)"/>
+	</include>
   
 	<node name = "my_rqt_dashboard"
 			pkg = "rqt_gui"

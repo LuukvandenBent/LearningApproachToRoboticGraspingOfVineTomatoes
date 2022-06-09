@@ -32,3 +32,6 @@ int32 NO_OBJECT_DETECTED = 500
 
 # checks
 int32 DEPTH_TOO_LOW = 600
+
+# calibration error
+int32 TAKE_SAMPLE_ERROR = 700 

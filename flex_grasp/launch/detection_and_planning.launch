@@ -3,8 +3,11 @@
 
 	<!-- The gui should only launch when all nodes are running, when experiencing issues tune this value-->
 	<arg name="gui_start_delay"			default="8"/>
+
+	<!-- When set to "true", the RealSense will be launched-->
+	<arg name="launch_realsense"               default="true"/>
   	
-	  <!-- debug settings -->
+	<!-- debug settings -->
 	<arg name="pipeline_debug"				default="false"/>
 	<arg name="object_detection_debug"		default="true"/>
 	<arg name="plan_movement_debug"			default="true"/>
@@ -16,7 +19,7 @@
 	<arg name="ee_group_name"           	default="gripper"/>
 	<arg name="planning_frame" 				default="world"/> 
 	<arg name="robot_base_frame" 			default="panda/base_link"/>
-
+	
 	<include file="$(find flex_calibrate)/launch/calibrate.launch">
 		<arg name="calibrate_debug" value="$(arg calibrate_debug)"/>
 		<arg name="start_rviz" value="false"/>
@@ -26,34 +29,53 @@
 		<arg name="manipulator_group_name" value="$(arg manipulator_group_name)"/>
 		<arg name="ee_group_name" value="$(arg ee_group_name)"/>
 	</include>
+
+	<group ns="$(arg robot_name)">
+
+		<include if="$(arg launch_realsense)" file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+			<arg name="align_depth" 	value="true"/>
+			<arg name="depth_width" 	value="640"/>
+			<arg name="depth_height" 	value="480"/>
+			<arg name="depth_fps" 		value="15"/>
+			<arg name="color_width" 	value="640"/>
+			<arg name="color_height" 	value="480"/>
+			<arg name="color_fps" 		value="15"/>
+		</include>
+
+		<!-- <param name="use_truss" value="$(arg use_truss)"/> -->
+		<param name="planning_frame" value="$(arg planning_frame)"/>
+		<param name="manipulator_group_name" value="$(arg manipulator_group_name)"/>
+		<param name="ee_group_name" value="$(arg ee_group_name)"/>
+		<param name="robot_base_frame" value="$(arg robot_base_frame)"/>
   
-	<node name = "my_rqt_dashboard"
-			pkg = "rqt_gui"
-			type = "rqt_gui"
-			respawn = "false"
-			output = "screen"
-			args = "--perspective-file $(find rqt_user_interface)/config/my_dashboard.perspective"
-			launch-prefix="bash -c 'sleep $(arg gui_start_delay); $0 $@' "/>
+		<node name = "my_rqt_dashboard"
+				pkg = "rqt_gui"
+				type = "rqt_gui"
+				respawn = "false"
+				output = "screen"
+				args = "--perspective-file $(find rqt_user_interface)/config/my_dashboard.perspective"
+				launch-prefix="bash -c 'sleep $(arg gui_start_delay); $0 $@' "/>
 
-	<node name="pipeline"
-			pkg="flex_grasp"
-			type="pipeline.py"
-			output="screen">
-			<param name ="debug" value="$(arg pipeline_debug)"/>
-	</node>
+		<node name="pipeline"
+				pkg="flex_grasp"
+				type="pipeline.py"
+				output="screen">
+				<param name ="debug" value="$(arg pipeline_debug)"/>
+		</node>
 
-  	<node name="object_detection"
-			pkg="flex_grasp"
-			type="object_detection_node.py"
-			output="screen">
-			<param name ="debug" value="$(arg object_detection_debug)"/>
-	</node>
+		<node name="object_detection"
+				pkg="flex_grasp"
+				type="object_detection_node.py"
+				output="screen">
+				<param name ="debug" value="$(arg object_detection_debug)"/>
+		</node>
 
-	<node name="plan_movement"
-			pkg="flex_grasp"
-			type="plan_movement_node.py"
-			output="screen">
-			<param name ="debug" value="$(arg plan_movement_debug)"/>
-	</node>
+		<node name="plan_movement"
+				pkg="flex_grasp"
+				type="plan_movement_node.py"
+				output="screen">
+				<param name ="debug" value="$(arg plan_movement_debug)"/>
+		</node>
+	</group>
 </launch>
 

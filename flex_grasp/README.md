@@ -208,7 +208,7 @@ With the drop down menu you can select where to store the results.
 ## 3 Working with Panda Franka Emika
 
 ### How to start the impedance controller
-roslaunch franka_example_controllers cartesian_impedance_example_controller.launch robot_ip:=<robot_ip> load_gripper:=True
+roslaunch franka_human_friendly_controllers cartesian_variable_impedance_controller.launch robot_ip:=<robot_ip> load_gripper:=True
 
 For example, <robot_ip>=172.16.0.2
 

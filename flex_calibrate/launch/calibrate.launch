@@ -7,15 +7,15 @@
     <arg name="start_independent"       default="false"/>
 
     <arg name="namespace_prefix"        default="calibration"/>
-    <arg name="eye_on_hand"             default="false"/>
+    <arg name="eye_on_hand"             default="true"/>
 
     <!-- Aruco settings -->
     <arg name="use_aruco"               default="true" doc="When set to false a tracking simulator will be used"/>
-    <arg name="marker_size"             default="0.039" doc="Size of the ArUco marker used, in meters"/>
+    <arg name="marker_size"             default="0.055" doc="Size of the ArUco marker used, in meters"/>
     <arg name="marker_id"               default="26" doc="The ID of the ArUco marker used"/>
 
     <!-- Robot setting -->
-    <arg name="robot_name"              default="px150"/>
+    <arg name="robot_name"              default="panda"/>
     <arg name="manipulator_group_name"  default="interbotix_arm"/>
     <arg name="ee_group_name"           default="interbotix_gripper"/>
 
@@ -25,7 +25,7 @@
     <arg name="tracking_base_frame"     default="camera_link" /> <!--  camera_bottom_screw_frame -->
     <arg name="marker_frame"            default="tracking_marker" />
 
-    <arg name="calibrate_debug"         default="false"/>
+    <arg name="calibrate_debug"         default="true"/>
 
     <!-- start the simulated tracking -->
     <node unless="$(arg use_aruco)"  name="tracking_simulator" pkg="flex_calibrate" type="tracking_simulator.py" output="screen">
@@ -61,8 +61,8 @@
     <group ns="$(arg robot_name)">
        <!-- start ArUco -->
       <node if="$(arg use_aruco)" name="aruco_tracker" pkg="aruco_ros" type="single">
-          <remap from="/camera_info" to="camera/color/camera_info" />
-          <remap from="/image" to="camera/color/image_raw" />
+          <remap from="/camera_info"      to="/panda/camera/color/camera_info" />
+          <remap from="/image"            to="/panda/camera/color/image_raw" />
           <param name="image_is_rectified" value="true"/>
           <param name="marker_size"        value="$(arg marker_size)"/>
           <param name="marker_id"          value="$(arg marker_id)"/>
@@ -104,7 +104,7 @@
       <node name="calibrate"
         pkg="flex_calibrate"
         type="calibration_node.py"
-        ns="$(arg namespace_prefix)_eye_on_base"
+        ns="$(arg namespace_prefix)_eye_on_hand"
         output="screen">
         <param name ="debug" value="$(arg calibrate_debug)"/>
       </node>

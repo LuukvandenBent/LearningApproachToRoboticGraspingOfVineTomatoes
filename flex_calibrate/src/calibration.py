@@ -10,6 +10,7 @@ import rospy
 import numpy as np
 import tf2_ros # for error messages
 import tf2_geometry_msgs
+import geometry_msgs
 
 # messages
 from std_msgs.msg import String
@@ -50,24 +51,28 @@ class Calibration(object):
 
         self.calibration_frame = rospy.get_param('/' + self.robot_ns + '/calibration_eye_on_hand' + '/' + 'robot_base_frame')
         self.planning_frame = rospy.get_param('/' + self.robot_ns + '/calibration_eye_on_hand' + '/' + 'tracking_base_frame')
+        self.end_effector_frame = rospy.get_param('/' + self.robot_ns + '/calibration_eye_on_hand' + '/' + 'robot_effector_frame')
         self.pose_array = None
 
         self.pub_e_out = rospy.Publisher("~e_out", FlexGraspErrorCodes, queue_size=10, latch=True)
         
-        move_robot_topic = '/plan_movement'
+        move_robot_topic = '/' + self.robot_ns + '/' + 'plan_movement'
         pose_array_topic = '/' + self.robot_ns + '/' + 'pose_array'
-        robot_pose_topic = '/panda_robot_pose'
+        calibration_pose_topic = '/panda_calibration_pose'
         
         self.move_robot_communication = Communication(move_robot_topic, timeout=15, node_name=self.node_name)
 
         self.pose_array_publisher = rospy.Publisher(pose_array_topic, PoseArray, queue_size=5, latch=True)
-        self.panda_pose_publisher = rospy.Publisher(robot_pose_topic, PoseStamped, queue_size=10, latch=False)
+        self.calibration_pose_publisher = rospy.Publisher(calibration_pose_topic, PoseStamped, queue_size=10, latch=False)
 
         self.output_logger = DataLogger(self.node_name, {"calibration": "calibration_transform"},
                                         {"calibration": TransformStamped}, bag_name=self.node_name)
 
         # Subscribe
         rospy.Subscriber("~e_in", String, self.e_in_cb)
+
+        # Subscribe to cartesian pose to broadcast end_effector tf
+        rospy.Subscriber('/cartesian_pose', PoseStamped, self.cartesian_pose_cb)
 
         # Subscribe to aruco tracker for it to publish the tf
         rospy.Subscriber('/' + self.robot_ns + '/' + 'aruco_tracker/pose', PoseStamped, self.aruco_tracker_cb)
@@ -85,29 +90,64 @@ class Calibration(object):
     def aruco_tracker_cb(self, msg):
         pass
 
+    def cartesian_pose_cb(self, data):
+        '''
+        Creates and broadcasts transform:
+            from    'panda/base_link' 
+            to      'panda/ee_arm_link'
+        '''
+        broadcaster = tf2_ros.StaticTransformBroadcaster()
+
+        position = data.pose.position
+        orientation = data.pose.orientation
+
+        transform = geometry_msgs.msg.TransformStamped()
+
+        transform.header.stamp = rospy.Time.now()
+        transform.header.frame_id = self.calibration_frame
+        transform.child_frame_id = self.end_effector_frame
+
+        transform.transform.translation.x = position.x
+        transform.transform.translation.y = position.y
+        transform.transform.translation.z = position.z
+        
+        transform.transform.rotation.x = orientation.x
+        transform.transform.rotation.y = orientation.y
+        transform.transform.rotation.z = orientation.z
+        transform.transform.rotation.w = orientation.w
+        
+        broadcaster.sendTransform(transform)
+
     def init_poses_1(self):
-        r_amplitude = 0.00
-        z_amplitude = 0.00
+        r_amplitude = 0.0
+        z_amplitude = -0.0
 
         r_min = 0.24
         z_min = 0.28 # 0.05
 
-        pos_intervals = 1
-        if pos_intervals == 1:
-            r_vec = [r_min + r_amplitude] # np.linspace(x_min, x_min + 2*x_amplitude, 2) #
-            z_vec = [z_min + z_amplitude]
+        pos_intervals = 2
+        if abs(r_amplitude) < 0.0001:
+            r_vec = [r_min]
         else:
             r_vec = np.linspace(r_min, r_min + 2*r_amplitude, pos_intervals)
+        
+        if abs(z_amplitude) < 0.0001:
+            z_vec = [z_min]
+        else:
             z_vec = np.linspace(z_min, z_min + 2*z_amplitude, pos_intervals)
 
-        ai_amplitude = np.deg2rad(38.0)
-        aj_amplitude = np.deg2rad(38.0)
-        ak_amplitude = np.deg2rad(15.0)
+        ai_amplitude = np.deg2rad(38.0) / 2.2
+        aj_amplitude = np.deg2rad(38.0) / 2.2
+        ak_amplitude = np.deg2rad(38.0) / 2.2
 
         rot_intervals = 2
         ai_vec = np.linspace(-ai_amplitude, ai_amplitude, rot_intervals)
         aj_vec = np.linspace(-aj_amplitude, aj_amplitude, rot_intervals)
         ak_vec = [-ak_amplitude, ak_amplitude]
+
+        rospy.logdebug(f'ai_vec: {ai_vec}')
+        rospy.logdebug(f'aj_vec: {aj_vec}')
+        rospy.logdebug(f'ak_vec: {ak_vec}')
 
         return self.generate_poses(r_vec, z_vec, ai_vec, aj_vec, ak_vec)
 
@@ -148,15 +188,16 @@ class Calibration(object):
         pose_array.header.stamp = rospy.Time.now()
 
         poses = []
-        for ak in ak_vec:
-            for r in r_vec:
-                for z in z_vec:
+        
+        for r in r_vec:
+            for z in z_vec:
+                for ak in ak_vec:
                     for aj in aj_vec:
                         for ai in ai_vec:
                             pose = Pose()
 
-                            x = r * np.cos(ak)
-                            y = r * np.sin(ak)
+                            x = abs(r * np.cos(ak))
+                            y = abs(r * np.sin(ak))
                             pose.position = list_to_position([x, y, z])
 
                             pose.orientation = list_to_orientation([ai, aj, ak])
@@ -195,6 +236,30 @@ class Calibration(object):
         self.pose_array = pose_array
         return FlexGraspErrorCodes.SUCCESS
 
+    def get_initial_base_cam_trans(self):
+        '''
+        Rough estimate of the starting position of the camera 
+        with respect to the base
+        
+        This determines the calibration poses
+        '''
+        trans = TransformStamped()
+
+        trans
+        trans.transform.translation.x = -0.3
+        trans.transform.translation.y = 0.3
+        trans.transform.translation.z = 0.6
+        
+        trans.transform.rotation.x = 0.707
+        trans.transform.rotation.y = 0.707
+        trans.transform.rotation.z = 0
+        trans.transform.rotation.w = 0
+
+        trans.header.frame_id = 'panda/base_link'
+        trans.child_frame_id = 'camera_link'
+
+        return trans
+
     def calibrate(self, track_marker=True):
 
         sample_list = self.client.get_sample_list().camera_marker_samples
@@ -227,20 +292,19 @@ class Calibration(object):
         if self.pose_array is None:
             rospy.logwarn(f"[{self.node_name}] pose_array is still empty")
             return FlexGraspErrorCodes.REQUIRED_DATA_MISSING
-
-        try:
-            trans = self.tfBuffer.lookup_transform(self.planning_frame,self.pose_array.header.frame_id,  rospy.Time(0))
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            rospy.logwarn(f"[{self.node_name}] failed to get transform from {self.pose_array.header.frame_id} to {self.planning_frame}")
-            return FlexGraspErrorCodes.TRANSFORM_POSE_FAILED
+        
+        trans = self.get_initial_base_cam_trans()
+        
+        rospy.logdebug(f'Transform: {trans}')
 
         # go to home
-        result = self.move_robot_communication.wait_for_result("home")
+        result = self.move_robot_communication.wait_for_result("move_home")
 
         if result != FlexGraspErrorCodes.SUCCESS:
             return result
-
-        rospy.logdebug(f'Transform: {trans}')
+        
+        rospy.logdebug(f'{len(self.pose_array.poses)} calibration poses')
+        rospy.logdebug(f'Calibration poses: {self.pose_array.poses}')
 
         for i, pose in enumerate(self.pose_array.poses):
             rospy.logdebug(f'Calibration pose {i+1}/{len(self.pose_array.poses)}')
@@ -256,16 +320,14 @@ class Calibration(object):
             pose_trans = tf2_geometry_msgs.do_transform_pose(pose_stamped, trans)
 
             rospy.logdebug(f'Pose Transformerd: {pose_trans}')
-            input('PRESS ENTER TO GO TO POSE')
 
-            # self.robot_pose_publisher.publish(pose_trans)
-            self.panda_pose_publisher.publish(pose_trans)
-            result = self.move_robot_communication.wait_for_result("calibration_movement") # timout = 5?
+            self.calibration_pose_publisher.publish(pose_trans)
+            result = self.move_robot_communication.wait_for_result("move_calibrate") # timout = 5?
 
             if result == FlexGraspErrorCodes.SUCCESS:
                 if track_marker:
                     # camera delay + wait a small amount of time for vibrations to stop
-                    rospy.sleep(1.5)
+                    rospy.sleep(3.0)
                     try:
                         self.client.take_sample()
                     except:
@@ -278,12 +340,9 @@ class Calibration(object):
             elif result == FlexGraspErrorCodes.DYNAMIXEL_SEVERE_ERROR:
                 rospy.logwarn(f"[{self.node_name}] Dynamixel error triggered, returning error")
                 return result
-            else:
-                rospy.logwarn(f"[{self.node_name}] Error triggered, returning error")
-                return result
 
         # return to home
-        result = self.move_robot_communication.wait_for_result("home")
+        result = self.move_robot_communication.wait_for_result("move_home")
         
         if result != FlexGraspErrorCodes.SUCCESS:
             return result
@@ -293,6 +352,7 @@ class Calibration(object):
             return FlexGraspErrorCodes.SUCCESS
         else:
             calibration_transform = self.client.compute_calibration()
+            rospy.logdebug(f"[{self.node_name}] Calibration transform: {calibration_transform.calibration.transform}")
 
             if calibration_transform.valid:
                 rospy.loginfo(f"[{self.node_name}] Found valid transfrom")

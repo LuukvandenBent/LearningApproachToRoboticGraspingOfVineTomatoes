@@ -16,8 +16,9 @@ class PlannerStateMachine(object):
                                 'move_right', 'move_left',
                                 'move_forwards', 'move_backwards',
                                 'move_upwards', 'move_downwards',
-                                'calibration_movement',
-                                'home']
+                                'move_calibrate',
+                                'move_home',
+                                'open', 'close']
 
     def run(self):
         rate = rospy.Rate(self._update_rate)

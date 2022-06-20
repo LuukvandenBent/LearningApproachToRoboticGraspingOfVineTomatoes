@@ -98,6 +98,7 @@ class ObjectDetection(object):
                      'pcl': self.point_cloud_cb}
 
         for key in types_in:
+            rospy.logdebug(f'topic {key}: {topics_in[key]}')
             rospy.Subscriber(topics_in[key], types_in[key], callbacks[key])
 
         return DataLogger(self.node_name, topics_in, types_in, bag_name='camera')
@@ -254,6 +255,7 @@ class ObjectDetection(object):
             return FlexGraspErrorCodes.NO_OBJECT_DETECTED
 
         self.tomato_info['bbox'] = bboxes[0]
+        rospy.logdebug(f'bbox coordinates: {self.tomato_info["bbox"]}')
         
         self.color_image_bboxed = np.array(bboxed_images[0])
         
@@ -302,7 +304,11 @@ class ObjectDetection(object):
 
         # orientation
         rospy.logdebug("[{0}] Object angle in degree {1}".format(self.node_name, np.rad2deg(angle)))
-        rpy = [0, 0, angle]
+        
+        if angle > 0:
+            rpy = [-angle + (np.pi/2), np.pi/2, 0]
+        else:
+            rpy = [-angle - (np.pi/2), np.pi/2, 0]
 
         rs_intrinsics = camera_info2rs_intrinsics(self.camera_info)
         depth_image_filter = DepthImageFilter(self.depth_image, rs_intrinsics, patch_size=5, node_name=self.node_name)
@@ -319,20 +325,25 @@ class ObjectDetection(object):
             rospy.logwarn(f'[{self.node_name}] Measured depth ({depth_measured}m) is too low (table height={table_height}m)')
             return FlexGraspErrorCodes.DEPTH_TOO_LOW
         
-        # temporary because RealSense has issues
-        depth = 0.27
+        depth = depth_measured
 
         xyz = depth_image_filter.deproject(row, col, depth)
 
-        if np.isnan(xyz).any():
+        rospy.logdebug(f'xyz: {xyz}')
+
+        # coordinate system of camera: x-forward, y-left, z-up
+        _xyz = [xyz[2], -xyz[0], -xyz[1]]
+        rospy.logdebug(f'xyz in camera frame: {_xyz}')
+
+        if np.isnan(_xyz).any():
             rospy.logwarn("[{0}] Failed to compute caging pose, will try based on segment!".format(self.node_name))
             xyz = depth_image_filter.deproject(row, col, segment=peduncle_mask)
 
-            if np.isnan(xyz).any():
+            if np.isnan(_xyz).any():
                 rospy.logwarn("[{0}] Failed to compute caging pose!".format(self.node_name))
                 return False
 
-        return point_to_pose_stamped(xyz, rpy, self.camera_frame, rospy.Time.now())
+        return point_to_pose_stamped(_xyz, rpy, self.camera_frame, rospy.Time.now())
 
     def get_table_height(self):
         """Estimate the distance between the camera and table"""

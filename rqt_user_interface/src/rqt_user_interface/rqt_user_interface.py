@@ -68,7 +68,6 @@ class RqtFlexGrasp(Plugin):
         self._widget.SpawnTrussButton.clicked[bool].connect(self.handle_spawn_truss)
         self._widget.SetPoseTrussButton.clicked[bool].connect(self.handle_set_pose_truss)
         self._widget.DetectTrussButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_truss"))
-        self._widget.SaveImageButton.clicked[bool].connect(lambda: self.pub_command.publish("save_image"))
 
         self._widget.PickPlaceButton.clicked[bool].connect(lambda: self.pub_command.publish("pick_place"))
         self._widget.PickButton.clicked[bool].connect(lambda: self.pub_command.publish("pick"))
@@ -82,6 +81,7 @@ class RqtFlexGrasp(Plugin):
         self._widget.MoveBackwardsButton.clicked[bool].connect(lambda: self.pub_command.publish("move_backwards"))
         self._widget.MoveUpwardsButton.clicked[bool].connect(lambda: self.pub_command.publish("move_upwards"))
         self._widget.MoveDownwardsButton.clicked[bool].connect(lambda: self.pub_command.publish("move_downwards"))
+        self._widget.MoveHomeButton.clicked[bool].connect(lambda: self.pub_command.publish("move_home"))
 
         self._widget.ExperimentButton.clicked.connect(self.handle_experiment)
 

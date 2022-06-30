@@ -24,17 +24,17 @@
     </item>
 
    <item row="1" column="0">
-    <widget class="QPushButton" name="HomeButton">
+    <widget class="QPushButton" name="SavePoseButton">
      <property name="text">
-      <string>Home</string>
+      <string>Save Pose</string>
      </property>
     </widget>
    </item>
 
    <item row="2" column="0">
-    <widget class="QPushButton" name="ReadyButton">
+    <widget class="QPushButton" name="MoveSavedPoseButton">
      <property name="text">
-      <string>Ready</string>
+      <string>Go to Saved Pose</string>
      </property>
     </widget>
    </item>
@@ -56,9 +56,9 @@
    </item>
 
    <item row="5" column="0">
-    <widget class="QPushButton" name="ApproachButton">
+    <widget class="QPushButton" name="ApproachGraspPointButton">
      <property name="text">
-      <string>Approach</string>
+      <string>Approach Grasp Point</string>
      </property>
     </widget>
    </item>
@@ -104,22 +104,22 @@
    </item>
 
    <item row="0" column="1">
-    <widget class="QComboBox" name="SelectSpawnTypeButton">
+    <widget class="QComboBox" name="ExperimentNameButton">
     </widget>
    </item>
 
    <item row="1" column="1">
-    <widget class="QPushButton" name="SpawnTrussButton">
+    <widget class="QPushButton" name="ApproachTrussButton">
      <property name="text">
-      <string>Spawn Truss</string>
+      <string>Approach Truss</string>
      </property>
     </widget>
    </item>
 
   <item row="2" column="1">
-    <widget class="QPushButton" name="SetPoseTrussButton">
+    <widget class="QPushButton" name="DetectGraspPointButton">
      <property name="text">
-      <string>Randomize Pose Truss</string>
+      <string>Detect Grasp Point</string>
      </property>
     </widget>
    </item>
@@ -134,7 +134,10 @@
 
 
    <item row="4" column="1">
-    <widget class="QComboBox" name="ExperimentNameButton">
+    <widget class="QPushButton" name="DetectGraspPointNNButton">
+     <property name="text">
+      <string>Detect Grasp Point NN</string>
+     </property>
     </widget>
    </item>
 
@@ -184,7 +187,7 @@
    </item>
 
    <item row="2" column="2">
-    <widget class="QPushButton" name="PlaceButton">
+    <widget class="QPushButton" name="MovePlaceButton">
      <property name="text">
       <string>Place</string>
      </property>

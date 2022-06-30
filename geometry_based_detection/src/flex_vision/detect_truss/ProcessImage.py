@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -11,6 +11,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from pathlib import Path
 
+sys.path.append(os.getcwd())
 
 from flex_vision.detect_truss.filter_segments import filter_segments
 from flex_vision.detect_truss.detect_peduncle_2 import detect_peduncle, visualize_skeleton, get_node_coord
@@ -972,6 +973,13 @@ def main():
     tomato_size = 'small'
     drive = "backup"  # "UBUNTU 16_0"  #
 
+    path = Path(os.getcwd())
+    pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
+    pwd_images = os.path.join(pwd_root, "data/bboxed_images")
+    pwd_json_read = os.path.join(pwd_root, "data/json")
+    pwd_results = os.path.join(pwd_root, "results/")
+    pwd_json_dump = os.path.join(pwd_results, 'json/')
+
     make_dirs(pwd_results)
     make_dirs(pwd_json_dump)
 
@@ -980,11 +988,7 @@ def main():
                                  save=save,
                                  com_grasp=com_grasp)
 
-    path = Path(os.getcwd())
-
     if bbox_detection:
-        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
-        pwd_images = os.path.join(pwd_root, "data/bboxed_images/")
         pwd_full_size_images = os.path.join(pwd_root, "data/images/")
         pwd_detections = os.path.join(pwd_root, "results/bbox_detection/")
 
@@ -1011,14 +1015,6 @@ def main():
                             bboxes=bboxes, 
                             full_size_image_shape=rgb_data.shape[:2])
     
-    else:
-        pwd_root = os.path.join(path.parent.parent, f"doc/{DIRECTORY}")
-
-    pwd_images = os.path.join(pwd_root, "data/bboxed_images")
-    pwd_json_read = os.path.join(pwd_root, "data/json")
-    pwd_results = os.path.join(pwd_root, "results/")
-    pwd_json_dump = os.path.join(pwd_results, 'json/')
-    
     data = os.listdir(pwd_images)
     images = [i for indx,i in enumerate(data) if data[indx][-4:] == '.png']
     
@@ -1035,7 +1031,7 @@ def main():
         tomato_name = i_tomato
         file_name = i_tomato
 
-        rgb_data = load_rgb(file_name, pwd=pwd_images, horizontal=True)
+        rgb_data = load_rgb(file_name, pwd=pwd_images, horizontal=True, compress=False)
         tomato_info = load_tomato_info(pwd_json_read, tomato_name)
         depth_data = load_depth(pwd_root=pwd_root, file_name=file_name)
         process_image.add_image(rgb_data, tomato_info=tomato_info, name=tomato_name, depth_data=depth_data)

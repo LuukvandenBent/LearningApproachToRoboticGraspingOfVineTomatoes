@@ -62,7 +62,7 @@ def make_dirs(pwd):
         os.makedirs(pwd)
 
 
-def load_rgb(name, pwd=None, horizontal=True):
+def load_rgb(name, pwd=None, horizontal=True, compress=False):
     """ load image """
     if pwd is None:
         name_full = os.path.join(name)
@@ -83,6 +83,10 @@ def load_rgb(name, pwd=None, horizontal=True):
 
     if img_rgb is None:
         print("Failed to load image from path: %s" % name_full)
+    
+    if img_rgb is not None and compress is True:
+        max_pixels = 80000
+        img_rgb = compress_img(img_rgb, max_pixels)
 
     return img_rgb
 
@@ -1144,3 +1148,20 @@ def create_bboxed_images(image, bboxes_pred, desired_size=510):
             cropped_images.append(cropped_im)
 
     return cropped_images, bboxes
+
+def compress_img(rgb_data, max_pixels):
+
+    image = Image.fromarray(rgb_data.astype('uint8'), 'RGB')
+    old_size = image.size 
+
+    n_pixels = old_size[0]*old_size[1]
+    
+    if max_pixels > n_pixels:
+        return rgb_data
+    
+    scale_ratio = max_pixels/n_pixels
+    new_size = tuple([int(x*scale_ratio) for x in old_size])
+    new_image = image.resize(new_size, Image.ANTIALIAS)
+    new_image = np.array(new_image)
+    
+    return new_image

@@ -4,7 +4,7 @@
 import rospy
 import math
 import time
-# import quaternion # pip install numpy-quaternion
+import quaternion # pip install numpy-quaternion
 from pyquaternion import Quaternion # pip install pyquaternion
 from scipy.spatial.transform import Rotation as R
 import numpy as np
@@ -13,6 +13,7 @@ from std_msgs.msg import Float32MultiArray, Float32
 
 import tf
 import tf2_ros
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 from flex_grasp.msg import FlexGraspErrorCodes
 
@@ -24,9 +25,12 @@ class Planner():
 
         self.r = rospy.Rate(10)
 
-        self.K_pos = 600
-        self.K_ori = 40
+        self.K_pos = 2000
+        self.K_ori = 50
         self.K_ns = 10
+
+        self.approach_height = 0.01     # delta_z when approaching the object
+        self.grasp_height = -0.01
 
         self.current_pos = None
         self.current_ori = None
@@ -37,15 +41,18 @@ class Planner():
         self.calibration_pos = None
         self.calibration_ori = None
 
+        self.saved_pos = None
+        self.saved_ori = None
+
         self.truss_pos = None
         self.truss_ori = None
 
         self.tfBuffer = tf2_ros.Buffer()
         tf2_ros.TransformListener(self.tfBuffer)
 
-        self.panda_pos_sub = rospy.Subscriber("/cartesian_pose", PoseStamped, self.ee_pose_callback)
-        self.truss_pos_sub = rospy.Subscriber("/panda/truss_pose", PoseStamped, self.truss_pose_callback)
-        self.robot_goal_pos_sub = rospy.Subscriber('/panda_calibration_pose', PoseStamped, self.calibration_pose_callback)
+        self.panda_pose_sub = rospy.Subscriber("/cartesian_pose", PoseStamped, self.ee_pose_callback)
+        self.truss_pose_sub = rospy.Subscriber("/panda/truss_pose", PoseStamped, self.truss_pose_callback)
+        self.robot_goal_pose_sub = rospy.Subscriber('/panda_calibration_pose', PoseStamped, self.calibration_pose_callback)
 
         self.goal_pub = rospy.Publisher('/equilibrium_pose', PoseStamped, queue_size=0)
         self.gripper_pub = rospy.Publisher('/gripper_online', Float32, queue_size=0)
@@ -59,32 +66,47 @@ class Planner():
         self.truss_pos = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
         self.truss_ori = np.array([data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z, data.pose.orientation.w])
 
-    def calibration_pose_callback(self,data):
+    def calibration_pose_callback(self, data):
         self.calibration_pos = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
         self.calibration_ori = np.array([data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z, data.pose.orientation.w])
 
+    def save_pose(self):
+        """
+        Current pose is saved
+        """
+        self.saved_pos = self.current_pos
+        self.saved_ori = self.current_ori
+
     def plan_movement(self, movement=None):
+
+        if movement == 'save_pose':
+            self.save_pose()
+            rospy.logdebug(f'[{self.node_name}] Current pose is saved')
+            return FlexGraspErrorCodes.SUCCESS
 
         goal = self.find_goal_pose(movement=movement)
         
         if movement == 'open' or movement == 'close':
             self.gripper_pub.publish(goal)
             return FlexGraspErrorCodes.SUCCESS
+    
+        is_safe = self.check_movement(goal)
         
-        else: 
-            is_safe = self.check_movement(goal)
+        if is_safe:
+            if movement != 'approach_truss':
+                goal = self.check_orientation(goal)
             
-            if is_safe:
-                result = self.go_to_pose(goal)
-                
-                if result == 'succes':
-                    return FlexGraspErrorCodes.SUCCESS
-                else:
-                    return FlexGraspErrorCodes.FAILURE
-            else:
-                rospy.logwarn(f'[{self.node_name}] Movement not safe')
-                rospy.logdebug(f'Goal pose: {goal}')
-                return FlexGraspErrorCodes.FAILURE
+            result = self.go_to_pose(goal)
+            
+        else:
+            rospy.logwarn(f'[{self.node_name}] Movement not safe')
+            rospy.logdebug(f'Goal pose: {goal}')
+            return FlexGraspErrorCodes.FAILURE
+        
+        if result == 'succes':
+            return FlexGraspErrorCodes.SUCCESS
+        else:
+            return FlexGraspErrorCodes.FAILURE
 
     def find_goal_pose(self, movement=None):
         
@@ -92,7 +114,7 @@ class Planner():
         if movement == 'open':
             goal = 0.02
         elif movement == 'close':
-            goal = 0.004
+            goal = 0.009
 
         # manipulator
         else:
@@ -104,20 +126,43 @@ class Planner():
                 goal_ori = self.calibration_ori
 
             elif movement == 'move_home':
-                goal_pos = np.array([-0.4, 0.5, 0.4])
+                goal_pos = np.array([-0.3, 0.4, 0.3])
+                goal_ori = np.array([0.70710678118, 0.70710678118, 0.0, 0.0])
+            
+            elif movement == 'move_place':
+                goal_pos = np.array([-0.53, 0.32, 0.03])
                 goal_ori = np.array([0.70710678118, 0.70710678118, 0.0, 0.0])
 
-            elif movement == 'approach' or movement == 'grasp':
+            elif movement == 'move_saved_pose':
+                goal_pos = self.saved_pos
+                goal_ori = self.saved_ori
+
+            elif movement == 'approach_truss' or movement == 'approach_grasp_point' or movement == 'grasp':
                 truss_pos = self.truss_pos
                 truss_ori = self.truss_ori
-                pos, ori = self.transform_pose(input_pos=truss_pos, input_ori=truss_ori)
-                
-                if movement == 'approach':
-                    pos[2] = pos[2] + 0.3       #move above object
+
+                # adjust the truss_pose because calibration is not perfect
+                pos, ori = self.adjust_pose(input_pos=truss_pos, input_ori=truss_ori)
+
+                # transform pose with calibration transform
+                pos, ori = self.transform_pose(input_pos=pos, input_ori=ori, movement=movement)
 
                 goal_pos = pos
                 goal_ori = ori
-            
+
+                if movement == 'approach_truss':
+                    goal_pos[2] = 0.22
+
+                    sf = np.sqrt(1/(goal_ori[0]**2 + goal_ori[1]**2))             #create unit length array
+                    goal_ori = np.array([goal_ori[0]*sf, goal_ori[1]*sf, 0, 0])   #ensure the end-effector is vertically oriented
+                
+                elif movement == 'approach_grasp_point':
+                    goal_pos[2] = goal_pos[2] + self.approach_height
+                    rospy.loginfo(f'[{self.node_name}] Moving {self.approach_height*100}cm above object')
+                
+                elif movement == 'grasp':
+                    goal_pos[2] = goal_pos[2] + self.grasp_height
+
             else:
                 if movement == 'move_right':
                     self.delta_pos = np.array([0.05,0.0,0.0])
@@ -155,8 +200,21 @@ class Planner():
             goal.pose.orientation.w = goal_ori[3]
 
         return goal
+
+    def adjust_pose(self, input_pos=None, input_ori=None):
+        """
+        Adjust pose slightly because calibration is not perfect
+        """
+
+        delta_pos = np.array([-0.005, 0.02, 0.003])
+        delta_ori = np.array([-0.00376818,  0.04237262, -0.00156235, -0.07763563])
+
+        pos = input_pos + delta_pos
+        ori = input_ori + delta_ori
+        
+        return pos, ori
     
-    def transform_pose(self, input_pos=None, input_ori=None):
+    def transform_pose(self, input_pos=None, input_ori=None, movement=None):
         """
         Transforms an input pose to the robot base frame
         
@@ -185,7 +243,12 @@ class Planner():
             return FlexGraspErrorCodes.TRANSFORM_POSE_FAILED
         
         rospy.logdebug(f'Transform: {transform}')
-        delta_pos = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z])
+        
+        if movement == 'approach_truss':
+            delta_pos = np.array([0., 0., 0.])
+        else:
+            delta_pos = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z])
+        
         delta_ori = np.array([transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w])
         trans_matrix2 = tf.TransformerROS.fromTranslationRotation(self, rotation=delta_ori, translation=delta_pos)
         rospy.logdebug(f'Translation 2: {trans_matrix2}')
@@ -193,7 +256,6 @@ class Planner():
         # transform 3: camera - object
         trans_matrix3 = tf.TransformerROS.fromTranslationRotation(self, rotation=input_ori, translation=input_pos)
         rospy.logdebug(f'Translation 3: {trans_matrix3}')
-
         
         # total transformation
         transformation = np.matmul(trans_matrix1,trans_matrix2)
@@ -208,9 +270,12 @@ class Planner():
         rospy.logdebug(f'Ori: {ori}')
 
         return pos, ori
-        
 
     def check_movement(self, goal_pose):
+        """
+        Check for collisions with table or end points that are far away
+        """
+        
         x = goal_pose.pose.position.x
         y = goal_pose.pose.position.y
         z = goal_pose.pose.position.z
@@ -221,10 +286,38 @@ class Planner():
             is_safe = False
 
         # gripper can not end below the table
-        if z < 0.03:
+        if z < 0.005:
             is_safe = False
         
         return is_safe
+
+    def check_orientation(self,goal_pose):
+        """
+        Ensure gripper orientation is within joint limits
+        """
+
+        x = goal_pose.pose.orientation.x
+        y = goal_pose.pose.orientation.y
+        z = goal_pose.pose.orientation.z
+        w = goal_pose.pose.orientation.w
+        quat = (x,y,z,w)
+
+        # quat = np.array(goal_pose.pose.orientation)
+        euler_angles = euler_from_quaternion(quat, 'sxyz')
+
+        # angle between 0 and -90 deg
+        if euler_angles[2] < 0 and euler_angles[2] > -1.57:
+            rospy.logdebug(f'[{self.node_name}] Orientation is flipped 180 degrees because of joint limits')
+            
+            # this somehow flips the sign of the angle
+            euler_angles = (euler_angles[0], euler_angles[1], euler_angles[2]+np.pi)
+            quat = quaternion_from_euler(euler_angles[0], euler_angles[1], -euler_angles[2], 'rxyz')
+            goal_pose.pose.orientation.x = quat[0]
+            goal_pose.pose.orientation.y = quat[1]
+            goal_pose.pose.orientation.z = quat[2]
+            goal_pose.pose.orientation.w = quat[3]
+
+        return goal_pose
 
     # control robot to desired goal position
     def go_to_pose(self, goal_pose):
@@ -329,12 +422,20 @@ class Planner():
                        'current_ori': self.current_ori is not None,
                        'all': True}
 
-        elif command == 'approach' or command == 'grasp':
+        elif command == 'approach_truss' or command == 'approach_grasp_point' or command == 'grasp':
             is_received = {'truss_pos': self.truss_pos is not None,
                        'truss_ori': self.truss_ori is not None,
                        'current_pose': self.current_pos is not None,
                        'current_ori': self.current_ori is not None,
                        'all': True}
+
+        elif command == 'move_saved_pose':
+            is_received = {'saved_pos': self.saved_pos is not None,
+                       'saved_ori': self.saved_ori is not None,
+                       'all': True}
+
+        elif command == 'open' or command == 'close':
+            is_received = {'all': True}
 
         else:
             is_received = {'current_pose': self.current_pos is not None,

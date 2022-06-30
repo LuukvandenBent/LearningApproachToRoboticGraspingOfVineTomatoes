@@ -67,7 +67,7 @@ class ObjectDetection(object):
 
         # params
         self.patch_size = 5
-        self.peduncle_height = 0.045  # [m]
+        self.peduncle_height = 0.04  # [m]
         self.settings = settings_lib_to_msg(self.process_image.get_settings())
 
         self.experiment_info = ExperimentInfo(self.node_name)
@@ -226,7 +226,7 @@ class ObjectDetection(object):
             rospy.logwarn("[{0}] Failed to save image to path %s".format(self.node_name, full_pwd))
             return FlexGraspErrorCodes.FAILURE
 
-    def detect_object(self):
+    def detect_object(self, command=None):
         """Detect object"""
 
         if self.playback:
@@ -256,80 +256,124 @@ class ObjectDetection(object):
 
         self.tomato_info['bbox'] = bboxes[0]
         rospy.logdebug(f'bbox coordinates: {self.tomato_info["bbox"]}')
-        
+
         self.color_image_bboxed = np.array(bboxed_images[0])
-        
-        self.process_image.add_image(self.color_image_bboxed, 
-                                     tomato_info=self.tomato_info,
-                                     depth_data=self.depth_image)
 
-        if self.settings is not None:
-            self.process_image.set_settings(settings_msg_to_lib(self.settings))
-
-        if not self.process_image.process_image():
-            rospy.logwarn(f"[{self.node_name}] Failed to process image")
+        if command == 'detect_truss':
+            
             self.save_data()
-            return FlexGraspErrorCodes.FAILURE
 
-        object_features = self.process_image.get_object_features(tomato_info=self.tomato_info)
-        tomato_mask, peduncle_mask, _ = self.process_image.get_segments()
-        truss_visualization = self.process_image.get_truss_visualization(local=True)
-        truss_visualization_total = self.process_image.get_truss_visualization(local=False)
+            output_messages = {}
+            output_messages['truss_pose'] = self.generate_truss_pose(bbox=bboxes[0], command=command)
+            
+            success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
+            return success
 
-        json_pwd = os.path.join(self.experiment_info.path, self.experiment_info.id, 'truss_features.json')
-        with open(json_pwd, 'w') as outfile:
-            json.dump(object_features, outfile)
-        self.save_data(result_img=truss_visualization)
+        elif command == 'detect_grasp_point':
 
-        depth_img = colored_depth_image(self.depth_image.copy())
+            self.process_image.add_image(self.color_image_bboxed, 
+                                        tomato_info=self.tomato_info,
+                                        depth_data=self.depth_image)
 
-        # publish results
-        # TODO: also publish result in global frame!
-        output_messages = {}
-        output_messages['depth_image'] = self.bridge.cv2_to_imgmsg(depth_img, encoding="rgb8")
-        output_messages['tomato_image'] = self.bridge.cv2_to_imgmsg(truss_visualization, encoding="rgba8")
-        output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
-        output_messages['truss_pose'] = self.generate_cage_pose(object_features['grasp_location']['full_size_image'], peduncle_mask)
+            if self.settings is not None:
+                self.process_image.set_settings(settings_msg_to_lib(self.settings))
 
-        success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
-        return success
+            if not self.process_image.process_image():
+                rospy.logwarn(f"[{self.node_name}] Failed to process image")
+                self.save_data()
+                return FlexGraspErrorCodes.FAILURE
 
-    def generate_cage_pose(self, grasp_features, peduncle_mask):
-        row = grasp_features['y']
-        col = grasp_features['x']
-        angle = grasp_features['angle']
-        if angle is None:
-            rospy.logwarn("Failed to compute caging pose: object detection returned None!")
-            return False
+            object_features = self.process_image.get_object_features(tomato_info=self.tomato_info)
+            tomato_mask, peduncle_mask, _ = self.process_image.get_segments()
+            truss_visualization = self.process_image.get_truss_visualization(local=True)
+            truss_visualization_total = self.process_image.get_truss_visualization(local=False)
 
-        # orientation
-        rospy.logdebug("[{0}] Object angle in degree {1}".format(self.node_name, np.rad2deg(angle)))
+            json_pwd = os.path.join(self.experiment_info.path, self.experiment_info.id, 'truss_features.json')
+            with open(json_pwd, 'w') as outfile:
+                json.dump(object_features, outfile)
+            self.save_data(result_img=truss_visualization)
+
+            depth_img = colored_depth_image(self.depth_image.copy())
+
+            # publish results
+            # TODO: also publish result in global frame!
+            output_messages = {}
+            output_messages['depth_image'] = self.bridge.cv2_to_imgmsg(depth_img, encoding="rgb8")
+            output_messages['tomato_image'] = self.bridge.cv2_to_imgmsg(truss_visualization, encoding="rgba8")
+            output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
+            output_messages['truss_pose'] = self.generate_truss_pose(grasp_features=object_features['grasp_location']['full_size_image'], peduncle_mask=peduncle_mask)
+
+            success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
+            return success
         
-        if angle > 0:
-            rpy = [-angle + (np.pi/2), np.pi/2, 0]
-        else:
-            rpy = [-angle - (np.pi/2), np.pi/2, 0]
+        elif command == 'detect_grasp_point_NN':
+            
+            self.save_data()
 
+            detection_model_path = os.path.join(Path(self.experiment_info.path).parent.parent.parent, 'detection_model/retinanet_465_imgs/')
+        
+    def generate_truss_pose(self, grasp_features=None, peduncle_mask=None, bbox=None, command=None):
+        
         rs_intrinsics = camera_info2rs_intrinsics(self.camera_info)
         depth_image_filter = DepthImageFilter(self.depth_image, rs_intrinsics, patch_size=5, node_name=self.node_name)
         table_height = round(self.get_table_height(),3)
-        depth_assumption = round(table_height - self.peduncle_height, 3)
-        depth_measured = round(depth_image_filter.get_depth(row, col), 3)
 
-        # location
         rospy.loginfo(f'[{self.node_name}] Table height: {table_height}')
-        rospy.loginfo(f'[{self.node_name}] Depth based on assumptions: {depth_assumption}')
-        rospy.loginfo(f'[{self.node_name}] Depth measured: {depth_measured}')
-        
-        if table_height < depth_measured + 0.02: #2cm margin
-            rospy.logwarn(f'[{self.node_name}] Measured depth ({depth_measured}m) is too low (table height={table_height}m)')
-            return FlexGraspErrorCodes.DEPTH_TOO_LOW
-        
-        depth = depth_measured
 
-        xyz = depth_image_filter.deproject(row, col, depth)
+        if command == 'detect_truss':
+            mid_point = [(bbox[0] + bbox[2])/2, (bbox[1] + bbox[3])/2]
+            
+            col = int(mid_point[0])
+            row = int(mid_point[1])
+            depth = table_height - self.peduncle_height
+            
+            if (bbox[2] - bbox[0]) > (bbox[3] - bbox[1]):
+                angle = np.pi/2
+                correction = [-0.03, 0, 0]
+            else:
+                # gripper rotates 90 degrees, so camera position needs to be adjusted
+                angle = np.pi
+                correction = [-0.09, -0.01, 0]
+            
+            rpy = [angle + np.pi/2, np.pi/2, 0]
 
-        rospy.logdebug(f'xyz: {xyz}')
+            xyz = depth_image_filter.deproject(row, col, depth)
+            xyz = [xyz[0] + correction[0], xyz[1] + correction[1], xyz[2] + correction[2]]
+            rospy.logdebug(f'xyz: {xyz}')
+        
+        else:
+            row = grasp_features['y']
+            col = grasp_features['x']
+            angle = grasp_features['angle']
+            if angle is None:
+                rospy.logwarn("Failed to compute caging pose: object detection returned None!")
+                return False
+
+            # orientation
+            rospy.logdebug("[{0}] Object angle in degree {1}".format(self.node_name, np.rad2deg(angle)))
+            
+            if angle < 0:
+                angle = angle + np.pi
+                
+            rpy = [angle + np.pi/2, np.pi/2, 0]
+
+            depth_assumption = round(table_height - self.peduncle_height, 3)
+            depth_measured = round(depth_image_filter.get_depth(row, col), 3)
+        
+            rospy.loginfo(f'[{self.node_name}] Depth based on assumptions: {depth_assumption}')
+            rospy.loginfo(f'[{self.node_name}] Depth measured: {depth_measured}')
+            
+            if table_height < depth_measured + 0.02: #2cm margin
+                rospy.logwarn(f'[{self.node_name}] Measured depth ({depth_measured}m) is too low (table height={table_height}m)')
+                return FlexGraspErrorCodes.DEPTH_TOO_LOW
+        
+            if depth_measured != depth_measured:        #check if nan
+                depth = 0.245
+            else:
+                depth = depth_measured
+
+            xyz = depth_image_filter.deproject(row, col, depth)
+            rospy.logdebug(f'xyz: {xyz}')
 
         # coordinate system of camera: x-forward, y-left, z-up
         _xyz = [xyz[2], -xyz[0], -xyz[1]]

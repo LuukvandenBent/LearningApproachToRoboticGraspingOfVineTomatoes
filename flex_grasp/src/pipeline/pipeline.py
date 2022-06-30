@@ -41,12 +41,9 @@ class Initializing(smach.State):
         
         # dict of nodes which need to be initialized!
         topic = {}
-        topic['monitor_robot'] = 'monitor_robot'
-        topic['transform_pose'] = 'transform_pose'
         topic['object_detection'] = 'object_detection'
-        topic['pick_place'] = 'pick_place'
-        topic['move_robot'] = 'move_robot'
-        topic['calibrate'] = 'calibration_eye_on_base/calibrate'
+        topic['plan_movement'] = 'plan_movement'
+        topic['calibrate'] = 'calibration_eye_on_hand/calibrate'
 
         # create for each node a communication channel
         communication = {}
@@ -82,10 +79,11 @@ DEFAULT_PLAYBACK = False
 
 class Idle(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['calibrate', 'detect', 'transform_pose', 'pick_place', 'move', 'spawn', 'failure'],
+        smach.State.__init__(self, outcomes=['calibrate', 'detect', 'transform_pose', 'pick_place', 'move', 'spawn', 'failure', 'plan'],
                              input_keys=['mode', 'command', 'prev_command'],
                              output_keys=['mode', 'command', 'prev_command'])
-                             
+
+        self.node_name = NODE_NAME                    
         self.command_op_topic = 'pipeline_command'
         self.simulation = rospy.get_param("robot_sim", DEFAULT_SIMULATION)
         self.playback = rospy.get_param("playback", DEFAULT_PLAYBACK)
@@ -93,17 +91,33 @@ class Idle(smach.State):
         self.experiment_path = None
 
         self.experiment_id_publisher = rospy.Publisher('experiment_id', String, queue_size=1, latch=True)
-        rospy.Subscriber("experiment", Bool, self.go_cb)
+        
+        self.run_experiment_topic = 'experiment'
+        rospy.Subscriber(self.run_experiment_topic, Bool, self.go_cb)
         rospy.Subscriber("experiment_pwd", String, self.experiment_pwd_cb)
 
         # commands
-        self.detect_commands = ['detect_tomato', 'detect_truss', 'save_image']
+        self.detect_commands = ['detect_tomato', 'detect_truss',
+                                'detect_grasp_point', 'detect_grasp_point_NN',
+                                 'save_image']
         self.transform_commands = ['transform']
         self.calibrate_commands = ['calibrate', 'calibrate_height']
-        self.move_commands = ['home', 'open', 'close', 'sleep', 'ready']
+        self.move_commands = ['home', 'sleep', 'ready']
         self.pick_place_commands = ['pick', 'place', 'pick_place']
         self.spawn_commands = ['spawn_truss', 'set_pose_truss']
+        self.plan_commands = [  'save_pose',
+                                'approach_truss', 'approach_grasp_point',
+                                'grasp', 
+                                'move_right', 'move_left',
+                                'move_forwards', 'move_backwards',
+                                'move_upwards', 'move_downwards',
+                                'move_calibrate',
+                                'move_saved_pose',
+                                'move_place',
+                                'move_home',
+                                'open', 'close']
         self.experiment = False
+        self.count_open = 0
 
     def experiment_pwd_cb(self, msg):
         """callback to update the data path"""
@@ -114,13 +128,14 @@ class Idle(smach.State):
 
     def go_cb(self, msg):
         self.experiment = msg.data
-        rospy.logdebug("[{0}] experiment mode is set to %s".format(NODE_NAME, self.experiment))
+        rospy.logdebug("[{0}] Experiment mode is set to {1}".format(NODE_NAME, self.experiment))
+        self.count_open = 0
 
     def execute(self, userdata):
         rospy.logdebug("[{0}] Executing state Idle".format(NODE_NAME))
         
         if self.experiment and (userdata.mode == 'free'):
-            rospy.loginfo('[PIPELINE] Entering experiment mode!')
+            rospy.loginfo(f'[{NODE_NAME}] Entering experiment mode!')
             userdata.mode = 'experiment'
             userdata.prev_command = None
         elif (userdata.mode == 'override') and (not self.experiment):
@@ -129,24 +144,40 @@ class Idle(smach.State):
             userdata.mode = 'free'
 
         if userdata.mode == 'experiment':
-            if (userdata.prev_command is None or userdata.prev_command == 'reset') and self.simulation:
-                userdata.command = 'spawn_truss'
-            elif userdata.prev_command is None or userdata.prev_command == 'reset' or userdata.prev_command == 'spawn_truss' or userdata.prev_command == 'set_pose_truss':
+            if userdata.prev_command is None or userdata.prev_command == 'reset' or userdata.prev_command == 'spawn_truss' or userdata.prev_command == 'set_pose_truss':
+                userdata.command = 'calibrate'
+            elif userdata.prev_command == 'calibrate':
+                userdata.command = 'open'
+                self.count_open += 1
+            elif userdata.prev_command == 'open' and self.count_open == 1:
                 userdata.command = 'detect_truss'
             elif userdata.prev_command == 'detect_truss':
-                userdata.command = 'transform'
-            elif userdata.prev_command == 'transform':
-                userdata.command = 'pick'
-            elif userdata.prev_command == 'pick':
-                userdata.command = 'place'
-            elif userdata.prev_command == 'place' and self.simulation:
-                userdata.command = 'set_pose_truss'
-            elif userdata.prev_command == 'place' and not self.simulation:
-                userdata.command = 'detect_truss'
+                userdata.command = 'approach_truss'
+            elif userdata.prev_command == 'approach_truss':
+                userdata.command = 'open'
+                self.count_open += 1
+            elif userdata.prev_command == 'open' and self.count_open == 2:
+                rospy.sleep(2.0)
+                rospy.loginfo('Continuing experiment')
+                userdata.command = 'detect_grasp_point'
+            elif userdata.prev_command == 'detect_grasp_point':
+                userdata.command = 'grasp'
+            elif userdata.prev_command == 'grasp':
+                userdata.command = 'close'
+            elif userdata.prev_command == 'close':
+                userdata.command = 'move_home'
+            elif userdata.prev_command == 'move_home':
+                userdata.command = 'move_place'
+            elif userdata.prev_command == 'move_place':
+                userdata.command = 'open'
+                self.count_open += 1
+            elif userdata.prev_command == 'open' and self.count_open == 3:
+                userdata.command = 'move_home'
+                userdata.mode = 'free'
+                self.experiment = False
+                self.count_open = 0
             else:
                 rospy.logwarn("[{0}] do not know what to do with previous command {1}".format(NODE_NAME, userdata.prev_command))
-        elif userdata.prev_command == 'detect_truss':
-            userdata.command = 'transform'
         else:
             userdata.command = rospy.wait_for_message(self.command_op_topic, String).data    
 
@@ -170,6 +201,8 @@ class Idle(smach.State):
             return 'pick_place'
         elif userdata.command in self.spawn_commands:
             return 'spawn'
+        elif userdata.command in self.plan_commands:
+            return 'plan'
         else:
             rospy.logwarn('Unknown command: %s', userdata.command)
             userdata.command = None
@@ -214,7 +247,7 @@ class CalibrateRobot(smach.State):
                              input_keys=['mode', 'command', 'prev_command'], 
                              output_keys=['mode', 'command', 'prev_command'])
                              
-        topic = 'calibration_eye_on_base/calibrate'
+        topic = 'calibration_eye_on_hand/calibrate'
         timeout = 60.0
         self.communication = Communication(topic, timeout = timeout)        
 
@@ -335,7 +368,33 @@ class MoveRobot(smach.State):
         userdata.prev_command = userdata.command
         userdata.command = None        
         return error_handling(result)
-            
+
+class PlanMovement(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['success', 'failure', 'complete_failure'], 
+                             input_keys=['mode', 'command', 'prev_command'], 
+                             output_keys=['mode', 'command', 'prev_command'])
+
+        topic = 'plan_movement'
+        timeout = 30.0
+        self.communication = Communication(topic, timeout=timeout)
+        
+        self.counter = 3
+
+    def execute(self, userdata):
+        
+        rospy.logdebug('Executing state Plan Movement')
+        result = self.communication.wait_for_result(userdata.command)
+
+        if result == FlexGraspErrorCodes.SUCCESS:
+            userdata.prev_command = userdata.command
+            userdata.command = None
+            return 'success'
+        else:
+            self.counter = self.counter - 1
+            if self.counter <= 0:
+                return 'complete_failure'
+            return 'failure'
             
 class PickPlace(smach.State):
     def __init__(self):
@@ -492,6 +551,7 @@ def main():
                                             'transform_pose':'PoseTransform',
                                             'pick_place': 'PickPlace',
                                             'move': 'MoveRobot',
+                                            'plan': 'PlanMovement',
                                             'spawn': 'SpawnObject',
                                             'failure': 'Idle'})
 
@@ -521,6 +581,11 @@ def main():
         smach.StateMachine.add('DetectObject', DetectObject(),
                                transitions={'success': 'Idle',
                                             'failure': 'DetectObject',
+                                            'complete_failure': 'StopMode'})
+
+        smach.StateMachine.add('PlanMovement', PlanMovement(),
+                               transitions={'success': 'Idle',
+                                            'failure': 'PlanMovement',
                                             'complete_failure': 'StopMode'})
 
         smach.StateMachine.add('PoseTransform', PoseTransform(),

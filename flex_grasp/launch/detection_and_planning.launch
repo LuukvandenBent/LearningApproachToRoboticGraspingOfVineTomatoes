@@ -8,7 +8,7 @@
 	<arg name="launch_realsense"               default="true"/>
   	
 	<!-- debug settings -->
-	<arg name="pipeline_debug"				default="false"/>
+	<arg name="pipeline_debug"				default="true"/>
 	<arg name="object_detection_debug"		default="true"/>
 	<arg name="plan_movement_debug"			default="true"/>
 	<arg name="calibrate_debug" 			default="true"/>
@@ -36,10 +36,10 @@
 			<arg name="align_depth" 	value="true"/>
 			<arg name="depth_width" 	value="640"/>
 			<arg name="depth_height" 	value="480"/>
-			<arg name="depth_fps" 		value="15"/>
+			<arg name="depth_fps" 		value="30"/>
 			<arg name="color_width" 	value="640"/>
 			<arg name="color_height" 	value="480"/>
-			<arg name="color_fps" 		value="15"/>
+			<arg name="color_fps" 		value="30"/>
 		</include>
 
 		<!-- <param name="use_truss" value="$(arg use_truss)"/> -->

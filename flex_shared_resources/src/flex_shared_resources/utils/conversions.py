@@ -89,7 +89,7 @@ def point_to_pose_stamped(xyz, rpy, frame, time):
     pose_stamped.header.frame_id = frame
     pose_stamped.header.stamp = time
 
-    quat = quaternion_from_euler(rpy[0], rpy[1], rpy[2])
+    quat = quaternion_from_euler(rpy[0], rpy[1], rpy[2], 'rxyz')
     pose_stamped.pose.orientation.x = quat[0]
     pose_stamped.pose.orientation.y = quat[1]
     pose_stamped.pose.orientation.z = quat[2]

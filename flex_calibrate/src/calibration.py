@@ -4,6 +4,8 @@
 Created on Thu May 14 14:28:49 2020
 
 @author: taeke
+
+edited by: Jens Zuurbier
 """
 
 import rospy
@@ -35,6 +37,7 @@ class Calibration(object):
         self.node_name = node_name
         self.playback = playback
         self.command = None
+        self.experiment_path = None
 
         if self.playback:
             rospy.loginfo(f"[{self.node_name}] Calibration launched in playback mode!")
@@ -67,6 +70,10 @@ class Calibration(object):
 
         self.output_logger = DataLogger(self.node_name, {"calibration": "calibration_transform"},
                                         {"calibration": TransformStamped}, bag_name=self.node_name)
+        
+        # Subscribe to path where results are stored
+        experiment_pwd_topic = '/' + self.robot_ns + '/' + 'experiment_pwd'
+        rospy.Subscriber(experiment_pwd_topic, String, self.experiment_pwd_cb)
 
         # Subscribe
         rospy.Subscriber("~e_in", String, self.e_in_cb)
@@ -76,6 +83,10 @@ class Calibration(object):
 
         # Subscribe to aruco tracker for it to publish the tf
         rospy.Subscriber('/' + self.robot_ns + '/' + 'aruco_tracker/pose', PoseStamped, self.aruco_tracker_cb)
+
+        # Subscribe to calibration transform to broadcast to '/tf' topic
+        calibration_tf_topic = '/' + self.robot_ns + '/calibration_eye_on_hand' + '/' + 'calibration_transform'
+        rospy.Subscriber(calibration_tf_topic, TransformStamped, self.broadcast_tf_cb)
 
     def e_in_cb(self, msg):
         if self.command is None:
@@ -118,9 +129,20 @@ class Calibration(object):
         
         broadcaster.sendTransform(transform)
 
+    def experiment_pwd_cb(self, msg):
+        """callback to find the path where results are stored"""
+        path = msg.data
+        self.experiment_path = path
+
+    def broadcast_tf_cb(self, data):
+        rospy.logdebug(f'[{self.node_name}] Found calibration tf and broadcasting it')
+        broadcaster = tf2_ros.StaticTransformBroadcaster()
+        transform = data
+        broadcaster.sendTransform(transform)
+
     def init_poses_1(self):
         r_amplitude = 0.0
-        z_amplitude = -0.0
+        z_amplitude = -0.05
 
         r_min = 0.24
         z_min = 0.28 # 0.05
@@ -136,14 +158,14 @@ class Calibration(object):
         else:
             z_vec = np.linspace(z_min, z_min + 2*z_amplitude, pos_intervals)
 
-        ai_amplitude = np.deg2rad(38.0) / 2.2
-        aj_amplitude = np.deg2rad(38.0) / 2.2
-        ak_amplitude = np.deg2rad(38.0) / 2.2
+        ai_amplitude = np.deg2rad(38.0) / 2.0     #rot around y-axis in base frame
+        aj_amplitude = np.deg2rad(38.0) / 2.1     #rot around x-axis in base frame
+        ak_amplitude = np.deg2rad(38.0) / 2.0     #rot around z-axis in base frame
 
         rot_intervals = 2
         ai_vec = np.linspace(-ai_amplitude, ai_amplitude, rot_intervals)
         aj_vec = np.linspace(-aj_amplitude, aj_amplitude, rot_intervals)
-        ak_vec = [-ak_amplitude, ak_amplitude]
+        ak_vec = np.linspace(-ak_amplitude, ak_amplitude, rot_intervals)
 
         rospy.logdebug(f'ai_vec: {ai_vec}')
         rospy.logdebug(f'aj_vec: {aj_vec}')
@@ -247,8 +269,8 @@ class Calibration(object):
 
         trans
         trans.transform.translation.x = -0.3
-        trans.transform.translation.y = 0.3
-        trans.transform.translation.z = 0.6
+        trans.transform.translation.y = 0.2
+        trans.transform.translation.z = 0.7
         
         trans.transform.rotation.x = 0.707
         trans.transform.rotation.y = 0.707
@@ -329,6 +351,7 @@ class Calibration(object):
                     # camera delay + wait a small amount of time for vibrations to stop
                     rospy.sleep(3.0)
                     try:
+                        input("PRESS ENTER TO TAKE SAMPLE")
                         self.client.take_sample()
                     except:
                         rospy.logwarn(f"[{self.node_name}] Failed to take sample, marker might not be visible.")
@@ -363,6 +386,48 @@ class Calibration(object):
                 rospy.logwarn(f"[{self.node_name}] Computed calibration is invalid")
                 return FlexGraspErrorCodes.FAILURE
 
+    def calibrate_manually(self):
+        '''
+        Calibrate by moving the manipulator manually 
+        '''
+
+        value = int(input("ENTER THE NUMBER OF CALIBRATION POSES: "))
+        
+        if value < 3:
+            rospy.logdebug(f'[{self.node_name}] Exiting calibration')
+            return FlexGraspErrorCodes.SUCCESS
+
+        rospy.logdebug(f'{value} calibration poses')
+
+        for i in range(value):
+            rospy.logdebug(f'Calibration pose {i+1}/{value}')
+
+            if rospy.is_shutdown():
+                return FlexGraspErrorCodes.SHUTDOWN
+
+            try:
+                input("PRESS ENTER TO TAKE SAMPLE")
+                self.client.take_sample()
+            except:
+                rospy.logwarn(f"[{self.node_name}] Failed to take sample, marker might not be visible.")
+                return FlexGraspErrorCodes.TAKE_SAMPLE_ERROR
+        
+        calibration_transform = self.client.compute_calibration()
+        rospy.logdebug(f"[{self.node_name}] Calibration transform: {calibration_transform.calibration.transform}")
+
+        response = input("DO YOU WANT TO BROADCAST AND SAVE THIS TRANSFORM? ('y' is yes)")
+        
+        if response == 'y':
+            if calibration_transform.valid:
+                rospy.loginfo(f"[{self.node_name}] Found valid transfrom")
+                self.broadcast(calibration_transform.calibration.transform)
+                self.client.save()
+            else:
+                rospy.logwarn(f"[{self.node_name}] Computed calibration is invalid")
+                return FlexGraspErrorCodes.FAILURE
+
+        return FlexGraspErrorCodes.SUCCESS
+
     def broadcast(self, transform):
         rospy.loginfo("[{0}] Broadcasting result".format(self.node_name))
         broadcaster = tf2_ros.StaticTransformBroadcaster()
@@ -372,6 +437,16 @@ class Calibration(object):
             self.output_logger.write_messages_to_bag({"calibration": transform},
                                                      self.experiment_info.path, self.experiment_info.id)
 
+    def publish_calibration_tf(self):
+        '''
+        Broadcasts calibration transform 
+        if it exists locally on computer
+        '''
+        bag_path = self.experiment_path + '/initial_calibration'
+        bag_id = ''
+        rospy.logdebug(f'bag path: {bag_path}')
+        self.output_logger.publish_messages_from_bag(bag_path, bag_id)
+
     def take_action(self):
         msg = FlexGraspErrorCodes()
         result = None
@@ -379,11 +454,15 @@ class Calibration(object):
         if self.command == 'e_init':
             result = FlexGraspErrorCodes.SUCCESS
 
-        elif self.command == 'calibrate':
-            result = self.init_poses_1()
+        # elif self.command == 'calibrate':
+        #     result = self.init_poses_1()
 
-            if result == FlexGraspErrorCodes.SUCCESS:
-                result = self.calibrate()
+        #     if result == FlexGraspErrorCodes.SUCCESS:
+        #         result = self.calibrate()
+
+        elif self.command == 'calibrate':
+            self.publish_calibration_tf()
+            result = self.calibrate_manually()
 
         elif self.command == 'calibrate_height':
             result = self.init_poses_2()

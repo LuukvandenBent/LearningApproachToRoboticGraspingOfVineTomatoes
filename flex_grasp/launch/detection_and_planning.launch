@@ -6,6 +6,9 @@
 
 	<!-- When set to "true", the RealSense will be launched-->
 	<arg name="launch_realsense"               default="true"/>
+
+	<!-- When set to "true", truss will be grasped close to the COM-->
+	<arg name="com_grasp"						default="true"/>
   	
 	<!-- debug settings -->
 	<arg name="pipeline_debug"				default="true"/>
@@ -47,6 +50,7 @@
 		<param name="manipulator_group_name" value="$(arg manipulator_group_name)"/>
 		<param name="ee_group_name" value="$(arg ee_group_name)"/>
 		<param name="robot_base_frame" value="$(arg robot_base_frame)"/>
+		<param name="com_grasp" value="$(arg com_grasp)"/>
   
 		<node name = "my_rqt_dashboard"
 				pkg = "rqt_gui"

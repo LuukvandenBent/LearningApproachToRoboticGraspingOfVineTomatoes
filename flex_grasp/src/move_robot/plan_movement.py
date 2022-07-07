@@ -27,10 +27,15 @@ class Planner():
 
         self.K_pos = 2000
         self.K_ori = 50
+        self.K_ori_x = 50
+        self.K_ori_y = 50
+        self.K_ori_z = 50
         self.K_ns = 10
 
         self.approach_height = 0.01     # delta_z when approaching the object
-        self.grasp_height = -0.01
+        self.grasp_height = -0.015
+        self.pre_grasp_height = 0.1
+        self.current_z = 1000
 
         self.current_pos = None
         self.current_ori = None
@@ -57,6 +62,9 @@ class Planner():
         self.goal_pub = rospy.Publisher('/equilibrium_pose', PoseStamped, queue_size=0)
         self.gripper_pub = rospy.Publisher('/gripper_online', Float32, queue_size=0)
         self.stiff_pub = rospy.Publisher('/stiffness', Float32MultiArray, queue_size=0)
+        
+        # z position required to determine the final grasp point
+        self.delta_z_pub = rospy.Publisher('/panda/delta_z', Float32, queue_size=0)
 
     def ee_pose_callback(self, data):
         self.current_pos = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
@@ -91,12 +99,18 @@ class Planner():
             return FlexGraspErrorCodes.SUCCESS
     
         is_safe = self.check_movement(goal)
+
+        if movement == 'grasp':
+            goals = self.adjust_grasp_movement(goal)
+        else:
+            goals = [goal]
         
         if is_safe:
-            if movement != 'approach_truss':
-                goal = self.check_orientation(goal)
+            for goal in goals:
+                if movement != 'approach_truss':
+                    goal = self.check_orientation(goal)
             
-            result = self.go_to_pose(goal)
+                result = self.go_to_pose(goal)
             
         else:
             rospy.logwarn(f'[{self.node_name}] Movement not safe')
@@ -126,7 +140,7 @@ class Planner():
                 goal_ori = self.calibration_ori
 
             elif movement == 'move_home':
-                goal_pos = np.array([-0.3, 0.4, 0.3])
+                goal_pos = np.array([-0.3, 0.4, 0.4])
                 goal_ori = np.array([0.70710678118, 0.70710678118, 0.0, 0.0])
             
             elif movement == 'move_place':
@@ -137,12 +151,18 @@ class Planner():
                 goal_pos = self.saved_pos
                 goal_ori = self.saved_ori
 
-            elif movement == 'approach_truss' or movement == 'approach_grasp_point' or movement == 'grasp':
+            elif movement == 'approach_truss' or movement == 'approach_grasp_point' or movement == 'pre_grasp' or movement == 'grasp':
                 truss_pos = self.truss_pos
                 truss_ori = self.truss_ori
 
                 # adjust the truss_pose because calibration is not perfect
                 pos, ori = self.adjust_pose(input_pos=truss_pos, input_ori=truss_ori)
+
+                if movement == 'pre_grasp':
+                    pos = self.adjust_pre_grasp_pos(input_pos=pos)
+
+                if movement == 'grasp':
+                    pos = self.adjust_grasp_pos(input_pos=pos)
 
                 # transform pose with calibration transform
                 pos, ori = self.transform_pose(input_pos=pos, input_ori=ori, movement=movement)
@@ -160,6 +180,12 @@ class Planner():
                     goal_pos[2] = goal_pos[2] + self.approach_height
                     rospy.loginfo(f'[{self.node_name}] Moving {self.approach_height*100}cm above object')
                 
+                elif movement == 'pre_grasp':
+                    goal_pos[2] = goal_pos[2] + self.pre_grasp_height
+                    goal_ori = self.current_ori
+                    
+                    self.current_z = self.current_pos[2]
+
                 elif movement == 'grasp':
                     goal_pos[2] = goal_pos[2] + self.grasp_height
 
@@ -213,6 +239,52 @@ class Planner():
         ori = input_ori + delta_ori
         
         return pos, ori
+
+    def adjust_pre_grasp_pos(self, input_pos=None):
+        """
+        Adjust pre_grasp pose because of calibration-gripper offset
+        """
+
+        delta_pos = np.array([0.0, -0.04, -0.05])
+        pos = input_pos + delta_pos
+        return pos
+
+    def adjust_grasp_movement(self, goal):
+        """
+        When grasping, first move to x cm above object and then move down
+        """
+        z = 0.03
+        step_size = 0.005
+        num_steps = int(z/step_size)
+        
+        
+        goals = []
+        for i in range(num_steps):
+            _goal = PoseStamped()
+                
+            _goal.pose.position.x = goal.pose.position.x
+            _goal.pose.position.y = goal.pose.position.y
+            _goal.pose.position.z = goal.pose.position.z + (z - (step_size * i))
+
+            _goal.pose.orientation.x = goal.pose.orientation.x
+            _goal.pose.orientation.y = goal.pose.orientation.y
+            _goal.pose.orientation.z = goal.pose.orientation.z
+            _goal.pose.orientation.w = goal.pose.orientation.w
+
+            goals.append(_goal)
+
+        goals.append(goal)
+
+        return goals
+    
+    def adjust_grasp_pos(self, input_pos=None):
+        """
+        Adjust grasp pose because of calibration-gripper offset
+        """
+
+        delta_pos = np.array([0.0, -0.02, 0.0])
+        pos = input_pos + delta_pos
+        return pos
     
     def transform_pose(self, input_pos=None, input_ori=None, movement=None):
         """
@@ -385,7 +457,7 @@ class Planner():
 
         stiff_des = Float32MultiArray()
 
-        stiff_des.data = np.array([self.K_pos, self.K_pos, self.K_pos, self.K_ori, self.K_ori, self.K_ori, self.K_ns]).astype(np.float32)
+        stiff_des.data = np.array([self.K_pos, self.K_pos, self.K_pos, self.K_ori_x, self.K_ori_y, self.K_ori_z, self.K_ns]).astype(np.float32)
         self.stiff_pub.publish(stiff_des)
         
         goal = PoseStamped()
@@ -409,6 +481,10 @@ class Planner():
             self.goal_pub.publish(goal)
       
             self.r.sleep()
+     
+        # publish delta_z of pre_grasp movement (needed for determining final grasp point)
+        delta_z = self.current_z - self.current_pos[2]
+        self.delta_z_pub.publish(delta_z)
         
         return 'succes'
 
@@ -422,7 +498,7 @@ class Planner():
                        'current_ori': self.current_ori is not None,
                        'all': True}
 
-        elif command == 'approach_truss' or command == 'approach_grasp_point' or command == 'grasp':
+        elif command == 'approach_truss' or command == 'approach_grasp_point' or command == 'pre_grasp' or command == 'grasp':
             is_received = {'truss_pos': self.truss_pos is not None,
                        'truss_ori': self.truss_ori is not None,
                        'current_pose': self.current_pos is not None,

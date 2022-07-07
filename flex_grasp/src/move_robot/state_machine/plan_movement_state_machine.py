@@ -13,7 +13,8 @@ class PlannerStateMachine(object):
         self._command = None
         self._shutdown_requested = False
         self.possible_commands = ['save_pose',
-                                'approach_truss', 'approach_grasp_point', 'grasp', 
+                                'approach_truss', 'approach_grasp_point', 
+                                'pre_grasp','grasp', 
                                 'move_right', 'move_left',
                                 'move_forwards', 'move_backwards',
                                 'move_upwards', 'move_downwards',

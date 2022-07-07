@@ -98,7 +98,8 @@ class Idle(smach.State):
 
         # commands
         self.detect_commands = ['detect_tomato', 'detect_truss',
-                                'detect_grasp_point', 'detect_grasp_point_NN',
+                                'detect_grasp_point', 'detect_grasp_point_close',
+                                'detect_grasp_point_NN',
                                  'save_image']
         self.transform_commands = ['transform']
         self.calibrate_commands = ['calibrate', 'calibrate_height']
@@ -107,6 +108,7 @@ class Idle(smach.State):
         self.spawn_commands = ['spawn_truss', 'set_pose_truss']
         self.plan_commands = [  'save_pose',
                                 'approach_truss', 'approach_grasp_point',
+                                'pre_grasp',
                                 'grasp', 
                                 'move_right', 'move_left',
                                 'move_forwards', 'move_backwards',
@@ -118,6 +120,7 @@ class Idle(smach.State):
                                 'open', 'close']
         self.experiment = False
         self.count_open = 0
+        self.com_grasp = rospy.get_param('/panda/com_grasp')
 
     def experiment_pwd_cb(self, msg):
         """callback to update the data path"""
@@ -129,6 +132,7 @@ class Idle(smach.State):
     def go_cb(self, msg):
         self.experiment = msg.data
         rospy.logdebug("[{0}] Experiment mode is set to {1}".format(NODE_NAME, self.experiment))
+        rospy.logdebug(f'[{NODE_NAME}] com_grasp is {self.com_grasp}')
         self.count_open = 0
 
     def execute(self, userdata):
@@ -157,10 +161,21 @@ class Idle(smach.State):
                 userdata.command = 'open'
                 self.count_open += 1
             elif userdata.prev_command == 'open' and self.count_open == 2:
+                # wait for vibrations to stop
                 rospy.sleep(2.0)
                 rospy.loginfo('Continuing experiment')
                 userdata.command = 'detect_grasp_point'
             elif userdata.prev_command == 'detect_grasp_point':
+                if self.com_grasp:
+                    userdata.command = 'pre_grasp'
+                else:
+                    userdata.command = 'pre_grasp'
+            elif userdata.prev_command == 'pre_grasp':
+                # wait for vibrations to stop
+                rospy.sleep(2.0)
+                rospy.loginfo('Continuing experiment')
+                userdata.command = 'detect_grasp_point_close'
+            elif userdata.prev_command == 'detect_grasp_point_close':
                 userdata.command = 'grasp'
             elif userdata.prev_command == 'grasp':
                 userdata.command = 'close'
@@ -266,7 +281,7 @@ class DetectObject(smach.State):
                              input_keys=['mode', 'command', 'prev_command'], 
                              output_keys=['mode', 'command', 'prev_command'])
         topic = 'object_detection'
-        timeout = 25.0
+        timeout = 45.0
         self.communication = Communication(topic, timeout = timeout) 
         self.counter = 3
 

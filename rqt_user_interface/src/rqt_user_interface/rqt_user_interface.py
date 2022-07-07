@@ -57,7 +57,6 @@ class RqtFlexGrasp(Plugin):
         self._widget.ExperimentButton.setCheckable(True)
         
         # basic commands
-        self._widget.SleepButton.clicked[bool].connect(lambda: self.pub_command.publish("sleep"))
         self._widget.OpenButton.clicked[bool].connect(lambda: self.pub_command.publish("open"))
         self._widget.CloseButton.clicked[bool].connect(lambda: self.pub_command.publish("close"))
         self._widget.CalibrateButton.clicked[bool].connect(lambda: self.pub_command.publish("calibrate"))
@@ -65,14 +64,15 @@ class RqtFlexGrasp(Plugin):
 
         self._widget.DetectTrussButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_truss"))
         self._widget.DetectGraspPointButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_grasp_point"))
+        self._widget.DetectGraspPointCloseButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_grasp_point_close"))
         self._widget.DetectGraspPointNNButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_grasp_point_NN"))
 
-        self._widget.PickPlaceButton.clicked[bool].connect(lambda: self.pub_command.publish("pick_place"))
         self._widget.PickButton.clicked[bool].connect(lambda: self.pub_command.publish("pick"))
         self._widget.MovePlaceButton.clicked[bool].connect(lambda: self.pub_command.publish("move_place"))
 
         self._widget.ApproachGraspPointButton.clicked[bool].connect(lambda: self.pub_command.publish("approach_grasp_point"))
         self._widget.ApproachTrussButton.clicked[bool].connect(lambda: self.pub_command.publish("approach_truss"))
+        self._widget.PreGraspButton.clicked[bool].connect(lambda: self.pub_command.publish("pre_grasp"))
         self._widget.GraspButton.clicked[bool].connect(lambda: self.pub_command.publish("grasp"))
         self._widget.MoveRightButton.clicked[bool].connect(lambda: self.pub_command.publish("move_right"))
         self._widget.MoveLeftButton.clicked[bool].connect(lambda: self.pub_command.publish("move_left"))

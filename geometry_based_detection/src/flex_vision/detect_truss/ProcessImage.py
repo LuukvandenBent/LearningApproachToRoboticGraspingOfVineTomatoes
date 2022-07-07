@@ -30,7 +30,7 @@ from flex_vision.utils.util import stack_segments, change_brightness
 from flex_vision.utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
 from flex_vision.utils.util import save_images, find_grasp_coords_and_angles, find_grasp_point_end_peduncle, find_grasp_point_com
 from flex_vision.utils.util import find_mean_of_array, find_px_per_mm
-from flex_vision.utils.util import create_bboxed_images
+from flex_vision.utils.util import create_bboxed_images, widen_bboxes
 
 from flex_vision.bbox_detection.bbox_detection import get_detection_model
 from flex_vision.bbox_detection.bbox_detection import predict_truss
@@ -439,11 +439,17 @@ class ProcessImage(object):
                     grasp_img[area_x[i]][area_y[j]] = 0
         
         grasp_coords, angles = find_grasp_coords_and_angles(grasp_img)
-        
-        xy_com = self.com.get_coord(self.LOCAL_FRAME_ID)
 
         if self.com_grasp:
-            grasp_pixel, angle = find_grasp_point_com(grasp_coords, angles, xy_com)
+            # when close_to_COM true, grasp point closest to COM is chosen, else grasp point closest to peduncle mid_point
+            close_to_COM = False
+
+            if close_to_COM:
+                mid_point = self.com.get_coord(self.LOCAL_FRAME_ID)
+            else:
+                _ = self.get_peduncle()
+                mid_point = self.peduncle_mid_point.get_coord(self.LOCAL_FRAME_ID)
+            grasp_pixel, angle = find_grasp_point_com(grasp_coords, angles, mid_point)
         else:
             peduncle_xy = coords_from_points(self.peduncle_points, self.LOCAL_FRAME_ID)
             grasp_pixel, angle = find_grasp_point_end_peduncle(grasp_coords, angles, self.peduncle_crop)
@@ -508,28 +514,31 @@ class ProcessImage(object):
         peduncle_length = np.sqrt(peduncle_dx**2 + peduncle_dy**2)
         peduncle_middle_point = [min(end_xy[0][0], end_xy[1][0]) + peduncle_dx/2, min(end_xy[0][1], end_xy[1][1])+ peduncle_dy/2]
         peduncle = {'junctions': junc_xy, 'ends': end_xy, 'peduncle_length': peduncle_length, 'peduncle_middle_point': peduncle_middle_point, 'peduncle': peduncle_xy}
+        
+        self.peduncle_mid_point = Point2D(peduncle_middle_point, self.ORIGINAL_FRAME_ID, self.transform)
+        
         return peduncle
 
-    def get_grasp_location(self, local=False):
-        """Returns a dictionary containing a description of the peduncle"""
-        if local:
-            frame_id = self.LOCAL_FRAME_ID
-            angle = self.grasp_angle_local
-        else:
-            frame_id = self.ORIGINAL_FRAME_ID
-            angle = self.grasp_angle_global
-        if self.grasp_point is not None:
-            xy = self.grasp_point.get_coord(frame_id)
-            grasp_pixel = np.around(xy).astype(int)
-            row = grasp_pixel[1]
-            col = grasp_pixel[0]
-        else:
-            row = 0      
-            col = 0      
-            xy = []
+    # def get_grasp_location(self, local=False):
+    #     """Returns a dictionary containing a description of the peduncle"""
+    #     if local:
+    #         frame_id = self.LOCAL_FRAME_ID
+    #         angle = self.grasp_angle_local
+    #     else:
+    #         frame_id = self.ORIGINAL_FRAME_ID
+    #         angle = self.grasp_angle_global
+    #     if self.grasp_point is not None:
+    #         xy = self.grasp_point.get_coord(frame_id)
+    #         grasp_pixel = np.around(xy).astype(int)
+    #         row = grasp_pixel[1]
+    #         col = grasp_pixel[0]
+    #     else:
+    #         row = 0      
+    #         col = 0      
+    #         xy = []
 
-        grasp_location = {"xy": xy, "row": int(row), "col": int(col), "angle": angle}
-        return grasp_location
+    #     grasp_location = {"xy": xy, "row": int(row), "col": int(col), "angle": angle}
+    #     return grasp_location
 
     def get_grasp_points(self, local=False, show_grasp_area=False):
         if local:
@@ -626,7 +635,8 @@ class ProcessImage(object):
         """
         Returns a dictionary containing the grasp_location, peduncle, and tomato
         """
-        tomatoes = self.get_tomatoes()
+        tomatoes = None
+        # tomatoes = self.get_tomatoes()
         peduncle = self.get_peduncle()
         grasp_location, __, __ = self.get_grasp_points()
         
@@ -660,7 +670,7 @@ class ProcessImage(object):
         else:
             return self.img_rgb
 
-    def get_truss_visualization(self, local=False, save=False, show_grasp_area=False):
+    def get_truss_visualization(self, local=False, save=False, show_grasp_area=True):
         pwd = os.path.join(self.pwd, '08_result')
 
         if local:
@@ -679,7 +689,7 @@ class ProcessImage(object):
             grasp_linewidth = 1
 
         grasp, grasp_img, grasp_points = self.get_grasp_points(local=local, show_grasp_area=show_grasp_area)
-        tomato = self.get_tomatoes(local=local)
+        # tomato = self.get_tomatoes(local=local)
         xy_junc = coords_from_points(self.junction_points, frame_id)
         img = self.get_rgb(local=local)
         skeleton_img = self.get_skeleton_img(img.shape,local=local)
@@ -687,7 +697,7 @@ class ProcessImage(object):
         # plot
         plt.figure()
         plot_image(img)
-        plot_features(tomato=tomato, zoom=zoom)
+        # plot_features(tomato=tomato, zoom=zoom)
         visualize_skeleton(img, skeleton_img, coord_junc=xy_junc, show_img=False, skeleton_width=skeleton_width, 
                             show_grasp_area=show_grasp_area,grasp=grasp,grasp_img=grasp_img,grasp_points=grasp_points)
         
@@ -740,79 +750,84 @@ class ProcessImage(object):
         img_rgb = self.get_rgb(local=local)
         plot_segments(img_rgb, background, tomato, peduncle, linewidth=0.5, pwd=pwd, name=name, alpha=1)
     
-    def find_grasp_points(self, skeleton_img, local=False):
+    # def find_grasp_points(self, skeleton_img, local=False):
 
-        if local:
-            frame_id = self.LOCAL_FRAME_ID
-        else:
-            frame_id = self.ORIGINAL_FRAME_ID
+    #     if local:
+    #         frame_id = self.LOCAL_FRAME_ID
+    #     else:
+    #         frame_id = self.ORIGINAL_FRAME_ID
         
-        grasp_img = skeleton_img.copy()
-        coord_junc, coord_end = get_node_coord(skeleton_img)
-        all_coords = np.vstack((coord_junc,coord_end))
+    #     grasp_img = skeleton_img.copy()
+    #     coord_junc, coord_end = get_node_coord(skeleton_img)
+    #     all_coords = np.vstack((coord_junc,coord_end))
 
-        for coord in all_coords:
-            coord = coord.astype(int)
+    #     for coord in all_coords:
+    #         coord = coord.astype(int)
 
-            radius = int(np.mean(grasp_img.shape) * 0.02)
-            area_x = np.arange(coord[1]-radius,coord[1]+radius)
-            area_y = np.arange(coord[0]-radius,coord[0]+radius)
-            for i in range(len(area_x)):
-                for j in range(len(area_y)):
-                    grasp_img[area_x[i]][area_y[j]] = 0
+    #         radius = int(np.mean(grasp_img.shape) * 0.02)
+    #         area_x = np.arange(coord[1]-radius,coord[1]+radius)
+    #         area_y = np.arange(coord[0]-radius,coord[0]+radius)
+    #         for i in range(len(area_x)):
+    #             for j in range(len(area_y)):
+    #                 grasp_img[area_x[i]][area_y[j]] = 0
         
-        # find possible grasp points
-        mask = []
-        for i in range(len(grasp_img)):
-            for j in range(len(grasp_img[i])):
-                if grasp_img[i][j] == 1:
-                    mask.append([i,j])
+    #     # find possible grasp points
+    #     mask = []
+    #     for i in range(len(grasp_img)):
+    #         for j in range(len(grasp_img[i])):
+    #             if grasp_img[i][j] == 1:
+    #                 mask.append([i,j])
         
-        subpath = [mask[0]]
-        grasp_points = []
-        angles = []
-        for i in range(len(mask)-1):
-            current_coord = mask[i]
-            next_coord = mask[i+1]
-            dist = np.sqrt((current_coord[0]-next_coord[0])**2 + (current_coord[1]-next_coord[1])**2)
+    #     subpath = [mask[0]]
+    #     grasp_points = []
+    #     angles = []
+    #     for i in range(len(mask)-1):
+    #         current_coord = mask[i]
+    #         next_coord = mask[i+1]
+    #         dist = np.sqrt((current_coord[0]-next_coord[0])**2 + (current_coord[1]-next_coord[1])**2)
 
-            if dist < 10:
-                subpath.append(next_coord)
-            else:
-                index = int(len(subpath)/2)
-                grasp_point = subpath[index]
-                grasp_point = [grasp_point[1], grasp_point[0]]
-                grasp_points.append(grasp_point)
+    #         if dist < 10:
+    #             subpath.append(next_coord)
+    #         else:
+    #             index = int(len(subpath)/2)
+    #             grasp_point = subpath[index]
+    #             grasp_point = [grasp_point[1], grasp_point[0]]
+    #             grasp_points.append(grasp_point)
 
-                start_node = subpath[0]
-                end_node = subpath[-1]
-                dx = end_node[1] - start_node[1]
-                dy = end_node[0] - start_node[0]
-                angle = np.arctan(dy/(dx+0.001))
-                angles.append(angle)
+    #             start_node = subpath[0]
+    #             end_node = subpath[-1]
+    #             dx = end_node[1] - start_node[1]
+    #             dy = end_node[0] - start_node[0]
+    #             angle = np.arctan(dy/(dx+0.001))
+    #             angles.append(angle)
                 
-                subpath = [next_coord]
+    #             subpath = [next_coord]
         
-        # mark grasp point closest to COM
-        xy_com = self.com.get_coord(frame_id)
-
-        shortest_dist = np.Inf
-        for i in range(len(grasp_points)):
-            grasp_point = grasp_points[i]
-            dist = np.sqrt((xy_com[0]-grasp_point[0])**2 + (xy_com[1]-grasp_point[1])**2)
-
-            if dist < shortest_dist:
-                shortest_dist = dist
-                i_shortest = i
+    #     # when true -> closest to COM, else closest to peduncle mid_point
+    #     close_to_COM = False
         
-        grasp_pixel = np.around(grasp_points[i_shortest]).astype(int)
-        row = grasp_pixel[1]
-        col = grasp_pixel[0]
-        angle = angles[i_shortest]
+    #     if close_to_COM:
+    #         mid_point = self.com.get_coord(frame_id)
+    #     else:
+    #         mid_point = self.peduncle_mid_point.get_coord(frame_id)
 
-        grasp_location = {"xy": grasp_pixel, "row": int(row), "col": int(col), "angle": angle}
+    #     shortest_dist = np.Inf
+    #     for i in range(len(grasp_points)):
+    #         grasp_point = grasp_points[i]
+    #         dist = np.sqrt((mid_point[0]-grasp_point[0])**2 + (mid_point[1]-grasp_point[1])**2)
 
-        return grasp_location, grasp_img, grasp_points 
+    #         if dist < shortest_dist:
+    #             shortest_dist = dist
+    #             i_shortest = i
+        
+    #     grasp_pixel = np.around(grasp_points[i_shortest]).astype(int)
+    #     row = grasp_pixel[1]
+    #     col = grasp_pixel[0]
+    #     angle = angles[i_shortest]
+
+    #     grasp_location = {"xy": grasp_pixel, "row": int(row), "col": int(col), "angle": angle}
+
+    #     return grasp_location, grasp_img, grasp_points 
 
     @Timer("process image")
     def process_image(self):
@@ -843,10 +858,10 @@ class ProcessImage(object):
             print ("Failed to detect peduncle")
             return success
 
-        success = self.detect_tomatoes()
-        if success is False:
-            print ("Failed to detect tomatoes")
-            return success
+        # success = self.detect_tomatoes()
+        # if success is False:
+        #     print ("Failed to detect tomatoes")
+        #     return success
 
         success = self.detect_grasp_location()
         if success is False:
@@ -866,7 +881,7 @@ class ProcessImage(object):
                 self.settings[key_1][key_2] = settings[key_1][key_2]
 
     @Timer("bounding_box_detection")
-    def bounding_box_detection(self, rgb_data=None, tomato_size=None, pwd_model=None):
+    def bounding_box_detection(self, rgb_data=None, tomato_size=None, pwd_model=None, com_grasp=True):
         """
         Bounding box detection
 
@@ -876,6 +891,8 @@ class ProcessImage(object):
 
         num_detections, bboxes_pred = predict_truss(rgb_data, 
                                                     inference_model)
+        if not com_grasp:
+            bboxes_pred = widen_bboxes(bboxes=bboxes_pred)
 
         cropped_images, bboxes = create_bboxed_images(rgb_data, 
                                                       bboxes_pred, 

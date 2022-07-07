@@ -1011,13 +1011,13 @@ def find_grasp_coords_and_angles(grasp_img):
 
     return grasp_coords, angles
 
-def find_grasp_point_com(grasp_coords, angles, xy_com):
+def find_grasp_point_com(grasp_coords, angles, mid_point):
     """Find grasp point closest to COM"""
 
     shortest_dist = np.Inf
     for i in range(len(grasp_coords)):
         grasp_coord = grasp_coords[i]
-        dist = np.sqrt((xy_com[0]-grasp_coord[0])**2 + (xy_com[1]-grasp_coord[1])**2)
+        dist = np.sqrt((mid_point[0]-grasp_coord[0])**2 + (mid_point[1]-grasp_coord[1])**2)
         
         if dist < shortest_dist:
             shortest_dist = dist
@@ -1113,6 +1113,22 @@ def find_px_per_mm(depth, image_shape, field_of_view=(69,42)):
     px_per_mm = (px_per_mm_x + px_per_mm_y)/2
 
     return px_per_mm
+
+def widen_bboxes(bboxes):
+    bboxes_new = []
+    
+    dx = 20
+    dy = 20
+
+    for i in range(len(bboxes)):
+        bbox = bboxes[i]
+        bbox_new = [bbox[0] - dx, bbox[1] - dy, bbox[2] + dx, bbox[3] + dy]
+        
+        # ensure no negatives values in bbox
+        bbox_new = [max(x, 0) for x in bbox_new]
+        bboxes_new.append(bbox_new)
+
+    return bboxes_new
 
 def create_bboxed_images(image, bboxes_pred, desired_size=510):
     image = Image.fromarray(image.astype('uint8'), 'RGB')

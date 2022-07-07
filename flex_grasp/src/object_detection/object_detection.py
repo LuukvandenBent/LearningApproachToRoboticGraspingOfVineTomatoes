@@ -13,8 +13,10 @@ import json
 import os
 from cv_bridge import CvBridge, CvBridgeError
 from pathlib import Path
+from PIL import Image as Img
 
 # msg
+from std_msgs.msg import Float32
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 from geometry_msgs.msg import PoseStamped
 from flex_grasp.msg import ImageProcessingSettings
@@ -44,8 +46,10 @@ class ObjectDetection(object):
             rospy.loginfo("[{0}] Object detection launched in playback mode!".format(self.node_name))
 
         # params
+        # self.com_grasp = False       # true when grasping in middle of peduncle, false when grasping at the end
+        self.com_grasp = rospy.get_param('/panda/com_grasp')
         self.camera_sim = rospy.get_param("camera_sim", DEFAULT_CAMERA_SIM)
-        self.process_image = ProcessImage(name='ros_tomato', pwd='', save=False)
+        self.process_image = ProcessImage(name='ros_tomato', pwd='', save=False, com_grasp=self.com_grasp)
 
         # frames
         self.camera_frame = "camera_color_optical_frame"
@@ -57,6 +61,10 @@ class ObjectDetection(object):
         self.pcl = None
         self.tomato_info = None
         self.color_image_bboxed = None
+        
+        self.final_depth = None
+        self.delta_z = None
+        self.scale_factor = None
 
         self.input_logger = self.initialize_input_logger()
         self.output_logger = self.initialize_output_logger()
@@ -77,8 +85,10 @@ class ObjectDetection(object):
 
         pub_image_processing_settings.publish(self.settings)
 
-        # TODO: log settings!
         rospy.Subscriber("image_processing_settings", ImageProcessingSettings, self.image_processing_settings_cb)
+        
+        # delta_z required to determine the final grasp_point
+        rospy.Subscriber("delta_z", Float32, self.delta_z_cb)
 
     def initialize_input_logger(self):
         # inputs
@@ -150,6 +160,9 @@ class ObjectDetection(object):
         self.settings = msg
         rospy.logdebug("[{0}] Received image processing settings".format(self.node_name))
 
+    def delta_z_cb(self, msg):
+        self.delta_z = msg.data
+
     def received_messages(self):
         """Returns a dictionary which contains information about what data has been received"""
         is_received = {'color_image': self.color_image is not None,
@@ -185,7 +198,7 @@ class ObjectDetection(object):
         self.print_received_messages(is_received)
         return False
 
-    def save_data(self, result_img=None):
+    def save_data(self, result_img=None, bboxed_img=None):
         """Save visual data"""
 
         pwd = os.path.join(Path(self.experiment_info.path), self.experiment_info.id)
@@ -195,17 +208,18 @@ class ObjectDetection(object):
         json_pwd = os.path.join(pwd, self.experiment_info.id + '_info.json')
 
         rgb_img = self.color_image
-        rgb_img_bboxed = self.color_image_bboxed
         depth_img = colored_depth_image(self.depth_image.copy())
 
         with open(json_pwd, "w") as write_file:
             json.dump(tomato_info, write_file)
 
         self.save_image(rgb_img, pwd=pwd, name=self.experiment_info.id + '_rgb.png')
-        self.save_image(rgb_img_bboxed, pwd=pwd, name=self.experiment_info.id + '_rgb_bboxed.png')
         self.save_image(depth_img, pwd=pwd, name=self.experiment_info.id + '_depth.png')
+        
         if result_img is not None:
             self.save_image(result_img, pwd=pwd, name=self.experiment_info.id + '_result.png')
+        if bboxed_img is not None:
+            self.save_image(bboxed_img, pwd=pwd, name=self.experiment_info.id + '_rgb_bboxed.png')
 
         return FlexGraspErrorCodes.SUCCESS
 
@@ -243,25 +257,32 @@ class ObjectDetection(object):
         self.tomato_info['tomato_size'] = 'small'
         self.tomato_info['full_size_image_shape'] = self.color_image.shape[:2]
 
-        detection_model_path = os.path.join(Path(self.experiment_info.path).parent.parent.parent, 'detection_model/retinanet_465_imgs/')
-        
-        bboxed_images, bboxes = self.process_image.bounding_box_detection(rgb_data=np.array(self.color_image), 
-                                                                            tomato_size=self.tomato_info['tomato_size'],
-                                                                            pwd_model=detection_model_path)
-        rospy.logdebug(f'{len(bboxed_images)} DETECTIONS')
+        if command == 'detect_grasp_point_close':
+            bbox_detection = False
+        else:
+            bbox_detection = True
 
-        if len(bboxed_images) == 0:
-            rospy.loginfo(f"[{self.node_name}] No object detected by RetinaNet")
-            return FlexGraspErrorCodes.NO_OBJECT_DETECTED
+        if bbox_detection:
+            detection_model_path = os.path.join(Path(self.experiment_info.path).parent.parent.parent, 'detection_model/retinanet_465_imgs/')
+            
+            bboxed_images, bboxes = self.process_image.bounding_box_detection(rgb_data=np.array(self.color_image), 
+                                                                                tomato_size=self.tomato_info['tomato_size'],
+                                                                                pwd_model=detection_model_path,
+                                                                                com_grasp=self.com_grasp)
+            rospy.logdebug(f'{len(bboxed_images)} DETECTIONS')
 
-        self.tomato_info['bbox'] = bboxes[0]
-        rospy.logdebug(f'bbox coordinates: {self.tomato_info["bbox"]}')
+            if len(bboxed_images) == 0:
+                rospy.loginfo(f"[{self.node_name}] No object detected by RetinaNet")
+                return FlexGraspErrorCodes.NO_OBJECT_DETECTED
 
-        self.color_image_bboxed = np.array(bboxed_images[0])
+            self.tomato_info['bbox'] = bboxes[0]
+            rospy.logdebug(f'bbox coordinates: {self.tomato_info["bbox"]}')
+
+            self.color_image_bboxed = np.array(bboxed_images[0])
 
         if command == 'detect_truss':
             
-            self.save_data()
+            self.save_data(bboxed_img=self.color_image_bboxed)
 
             output_messages = {}
             output_messages['truss_pose'] = self.generate_truss_pose(bbox=bboxes[0], command=command)
@@ -269,16 +290,44 @@ class ObjectDetection(object):
             success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
             return success
 
-        elif command == 'detect_grasp_point':
+        else:
+            
+            if command == 'detect_grasp_point':
+                image = self.color_image_bboxed
+                bboxed_image = self.color_image_bboxed
+                absolute_img = 'full_size_image'
 
-            self.process_image.add_image(self.color_image_bboxed, 
+            elif command == 'detect_grasp_point_close':
+                image = self.color_image
+                bboxed_image = None
+                absolute_img = 'bboxed_image'
+            
+            # compress image if size is above threshold
+            shape = image.shape[:2]
+            image_width = max(shape)
+
+            # maximum image size to be processed
+            max_image_width = 350 
+            
+            if image_width > max_image_width:
+                self.scale_factor = max_image_width / image_width
+                pil_image = Img.fromarray(image)
+
+                new_size = (int(round(self.scale_factor * shape[1], 0)), int(round(self.scale_factor * shape[0], 0)))
+                image_resized = pil_image.resize(new_size)
+                input_image = np.array(image_resized)
+            
+            else:
+                input_image = image
+
+            self.process_image.add_image(input_image, 
                                         tomato_info=self.tomato_info,
                                         depth_data=self.depth_image)
 
             if self.settings is not None:
                 self.process_image.set_settings(settings_msg_to_lib(self.settings))
 
-            if not self.process_image.process_image():
+            if not self.process_image.process_image():  
                 rospy.logwarn(f"[{self.node_name}] Failed to process image")
                 self.save_data()
                 return FlexGraspErrorCodes.FAILURE
@@ -291,7 +340,7 @@ class ObjectDetection(object):
             json_pwd = os.path.join(self.experiment_info.path, self.experiment_info.id, 'truss_features.json')
             with open(json_pwd, 'w') as outfile:
                 json.dump(object_features, outfile)
-            self.save_data(result_img=truss_visualization)
+            self.save_data(result_img=truss_visualization, bboxed_img=bboxed_image)
 
             depth_img = colored_depth_image(self.depth_image.copy())
 
@@ -301,16 +350,10 @@ class ObjectDetection(object):
             output_messages['depth_image'] = self.bridge.cv2_to_imgmsg(depth_img, encoding="rgb8")
             output_messages['tomato_image'] = self.bridge.cv2_to_imgmsg(truss_visualization, encoding="rgba8")
             output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
-            output_messages['truss_pose'] = self.generate_truss_pose(grasp_features=object_features['grasp_location']['full_size_image'], peduncle_mask=peduncle_mask)
+            output_messages['truss_pose'] = self.generate_truss_pose(grasp_features=object_features['grasp_location'][f'{absolute_img}'], peduncle_mask=peduncle_mask, command=command)
 
             success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
             return success
-        
-        elif command == 'detect_grasp_point_NN':
-            
-            self.save_data()
-
-            detection_model_path = os.path.join(Path(self.experiment_info.path).parent.parent.parent, 'detection_model/retinanet_465_imgs/')
         
     def generate_truss_pose(self, grasp_features=None, peduncle_mask=None, bbox=None, command=None):
         
@@ -333,7 +376,7 @@ class ObjectDetection(object):
             else:
                 # gripper rotates 90 degrees, so camera position needs to be adjusted
                 angle = np.pi
-                correction = [-0.09, -0.01, 0]
+                correction = [-0.12, -0.01, 0]
             
             rpy = [angle + np.pi/2, np.pi/2, 0]
 
@@ -345,6 +388,11 @@ class ObjectDetection(object):
             row = grasp_features['y']
             col = grasp_features['x']
             angle = grasp_features['angle']
+
+            if self.scale_factor is not None:
+                row = int(round(row / self.scale_factor, 0))
+                col = int(round(col / self.scale_factor, 0))
+            
             if angle is None:
                 rospy.logwarn("Failed to compute caging pose: object detection returned None!")
                 return False
@@ -356,21 +404,34 @@ class ObjectDetection(object):
                 angle = angle + np.pi
                 
             rpy = [angle + np.pi/2, np.pi/2, 0]
-
-            depth_assumption = round(table_height - self.peduncle_height, 3)
-            depth_measured = round(depth_image_filter.get_depth(row, col), 3)
-        
-            rospy.loginfo(f'[{self.node_name}] Depth based on assumptions: {depth_assumption}')
-            rospy.loginfo(f'[{self.node_name}] Depth measured: {depth_measured}')
             
-            if table_height < depth_measured + 0.02: #2cm margin
-                rospy.logwarn(f'[{self.node_name}] Measured depth ({depth_measured}m) is too low (table height={table_height}m)')
-                return FlexGraspErrorCodes.DEPTH_TOO_LOW
-        
-            if depth_measured != depth_measured:        #check if nan
-                depth = 0.245
-            else:
-                depth = depth_measured
+            if command == 'detect_grasp_point':
+                depth_assumption = round(table_height - self.peduncle_height, 3)
+                depth_measured = round(depth_image_filter.get_depth(row, col), 3)
+            
+                rospy.loginfo(f'[{self.node_name}] Depth based on assumptions: {depth_assumption}')
+                rospy.loginfo(f'[{self.node_name}] Depth measured: {depth_measured}')
+                
+                if table_height < depth_measured + 0.02: #2cm margin
+                    rospy.logwarn(f'[{self.node_name}] Measured depth ({depth_measured}m) is too low (table height={table_height}m)')
+                    return FlexGraspErrorCodes.DEPTH_TOO_LOW
+            
+                if depth_measured != depth_measured:        #check if nan
+                    rospy.logwarn(f'[{self.node_name}] Depth could not be measured')
+                    input('DO YOU WANT STILL WANT TO CONTINUE? (PRESS ENTER)')
+                    depth = 0.245
+                else:
+                    depth = depth_measured
+                    self.final_depth = depth
+
+            elif command == 'detect_grasp_point_close':
+                if self.final_depth is not None and self.delta_z is not None:
+                    depth = self.final_depth - self.delta_z
+                else:
+                    rospy.logwarn(f'[{self.node_name}] Final grasp point can not be determined, depth information is missing')
+                    rospy.logdebug(f'[{self.node_name}] Final depth = {self.final_depth}')
+                    rospy.logdebug(f'[{self.node_name}] Delta depth = {self.delta_z}')
+                    return FlexGraspErrorCodes.FAILURE
 
             xyz = depth_image_filter.deproject(row, col, depth)
             rospy.logdebug(f'xyz: {xyz}')

@@ -34,7 +34,7 @@ class ObjectDetectionStateMachine(object):
         if command is None:
             return
 
-        elif command == "detect_truss" or command == "detect_grasp_point" or command == "detect_grasp_point_NN":
+        elif command == "detect_truss" or command == "detect_grasp_point" or command == "detect_grasp_point_close" or command == "detect_grasp_point_NN":
             self._is_idle = False
             self.command = command
             self._object_detection.collect_messages()
@@ -54,7 +54,7 @@ class ObjectDetectionStateMachine(object):
             self._input.command_rejected()
 
     def _process_detect_state(self):
-        if self.command == "detect_truss" or self.command == 'detect_grasp_point' or self.command == 'detect_grasp_point_NN':
+        if self.command == "detect_truss" or self.command == 'detect_grasp_point' or self.command == 'detect_grasp_point_close' or self.command == 'detect_grasp_point_NN':
             if self._object_detection.wait_for_messages():
                 self._object_detection.log_input_messages()
                 result = self._object_detection.detect_object(command=self.command)

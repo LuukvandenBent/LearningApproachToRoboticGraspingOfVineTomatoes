@@ -16,7 +16,7 @@ from pathlib import Path
 from PIL import Image as Img
 
 # msg
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 from geometry_msgs.msg import PoseStamped
 from flex_grasp.msg import ImageProcessingSettings
@@ -46,8 +46,7 @@ class ObjectDetection(object):
             rospy.loginfo("[{0}] Object detection launched in playback mode!".format(self.node_name))
 
         # params
-        # self.com_grasp = False       # true when grasping in middle of peduncle, false when grasping at the end
-        self.com_grasp = rospy.get_param('/panda/com_grasp')
+        self.com_grasp = rospy.get_param('/panda/com_grasp')       # true when grasping in middle of peduncle, false when grasping at the end
         self.camera_sim = rospy.get_param("camera_sim", DEFAULT_CAMERA_SIM)
         self.process_image = ProcessImage(name='ros_tomato', pwd='', save=False, com_grasp=self.com_grasp)
 
@@ -89,6 +88,9 @@ class ObjectDetection(object):
         
         # delta_z required to determine the final grasp_point
         rospy.Subscriber("delta_z", Float32, self.delta_z_cb)
+
+        # publisher to store the location of the grasping point in the image
+        self.pub_grasp_point_location = rospy.Publisher('grasp_point_location', String, queue_size=0)
 
     def initialize_input_logger(self):
         # inputs
@@ -257,10 +259,10 @@ class ObjectDetection(object):
         self.tomato_info['tomato_size'] = 'small'
         self.tomato_info['full_size_image_shape'] = self.color_image.shape[:2]
 
-        if command == 'detect_grasp_point_close':
-            bbox_detection = False
-        else:
+        if command == 'detect_truss':
             bbox_detection = True
+        else:
+            bbox_detection = False
 
         if bbox_detection:
             detection_model_path = os.path.join(Path(self.experiment_info.path).parent.parent.parent, 'detection_model/retinanet_465_imgs/')
@@ -275,7 +277,9 @@ class ObjectDetection(object):
                 rospy.loginfo(f"[{self.node_name}] No object detected by RetinaNet")
                 return FlexGraspErrorCodes.NO_OBJECT_DETECTED
 
+            self.tomato_info['n_detections'] = len(bboxed_images)
             self.tomato_info['bbox'] = bboxes[0]
+            self.tomato_info['all_bboxes'] = bboxes
             rospy.logdebug(f'bbox coordinates: {self.tomato_info["bbox"]}')
 
             self.color_image_bboxed = np.array(bboxed_images[0])
@@ -293,15 +297,21 @@ class ObjectDetection(object):
         else:
             
             if command == 'detect_grasp_point':
-                image = self.color_image_bboxed
-                bboxed_image = self.color_image_bboxed
-                absolute_img = 'full_size_image'
-
-            elif command == 'detect_grasp_point_close':
+                # image = self.color_image_bboxed
+                # bboxed_image = self.color_image_bboxed
+                # absolute_img = 'full_size_image'
                 image = self.color_image
                 bboxed_image = None
                 absolute_img = 'bboxed_image'
-            
+
+            elif command == 'detect_grasp_point_close' or command == 'detect_grasp_point_2':
+                image = self.color_image
+                bboxed_image = None
+                absolute_img = 'bboxed_image'
+
+            self.process_image = ProcessImage(name='ros_tomato', pwd='', save=False, com_grasp=self.com_grasp, 
+                                            command=command)
+                
             # compress image if size is above threshold
             shape = image.shape[:2]
             image_width = max(shape)
@@ -335,7 +345,7 @@ class ObjectDetection(object):
             object_features = self.process_image.get_object_features(tomato_info=self.tomato_info)
             tomato_mask, peduncle_mask, _ = self.process_image.get_segments()
             truss_visualization = self.process_image.get_truss_visualization(local=True)
-            truss_visualization_total = self.process_image.get_truss_visualization(local=False)
+            # truss_visualization_total = self.process_image.get_truss_visualization(local=False)
 
             json_pwd = os.path.join(self.experiment_info.path, self.experiment_info.id, 'truss_features.json')
             with open(json_pwd, 'w') as outfile:
@@ -349,7 +359,7 @@ class ObjectDetection(object):
             output_messages = {}
             output_messages['depth_image'] = self.bridge.cv2_to_imgmsg(depth_img, encoding="rgb8")
             output_messages['tomato_image'] = self.bridge.cv2_to_imgmsg(truss_visualization, encoding="rgba8")
-            output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
+            # output_messages['tomato_image_total'] = self.bridge.cv2_to_imgmsg(truss_visualization_total, encoding="rgba8")
             output_messages['truss_pose'] = self.generate_truss_pose(grasp_features=object_features['grasp_location'][f'{absolute_img}'], peduncle_mask=peduncle_mask, command=command)
 
             success = self.output_logger.publish_messages(output_messages, self.experiment_info.path, self.experiment_info.id)
@@ -372,11 +382,11 @@ class ObjectDetection(object):
             
             if (bbox[2] - bbox[0]) > (bbox[3] - bbox[1]):
                 angle = np.pi/2
-                correction = [-0.03, 0, 0]
+                correction = [-0.04, 0, 0]
             else:
                 # gripper rotates 90 degrees, so camera position needs to be adjusted
                 angle = np.pi
-                correction = [-0.12, -0.01, 0]
+                correction = [-0.125, -0.01, 0]
             
             rpy = [angle + np.pi/2, np.pi/2, 0]
 
@@ -405,14 +415,14 @@ class ObjectDetection(object):
                 
             rpy = [angle + np.pi/2, np.pi/2, 0]
             
-            if command == 'detect_grasp_point':
+            if command == 'detect_grasp_point' or command == 'detect_grasp_point_2':
                 depth_assumption = round(table_height - self.peduncle_height, 3)
                 depth_measured = round(depth_image_filter.get_depth(row, col), 3)
             
                 rospy.loginfo(f'[{self.node_name}] Depth based on assumptions: {depth_assumption}')
                 rospy.loginfo(f'[{self.node_name}] Depth measured: {depth_measured}')
                 
-                if table_height < depth_measured + 0.02: #2cm margin
+                if table_height < depth_measured:
                     rospy.logwarn(f'[{self.node_name}] Measured depth ({depth_measured}m) is too low (table height={table_height}m)')
                     return FlexGraspErrorCodes.DEPTH_TOO_LOW
             
@@ -422,7 +432,8 @@ class ObjectDetection(object):
                     depth = 0.245
                 else:
                     depth = depth_measured
-                    self.final_depth = depth
+                
+                self.final_depth = depth
 
             elif command == 'detect_grasp_point_close':
                 if self.final_depth is not None and self.delta_z is not None:
@@ -435,6 +446,14 @@ class ObjectDetection(object):
 
             xyz = depth_image_filter.deproject(row, col, depth)
             rospy.logdebug(f'xyz: {xyz}')
+
+            if xyz[0] < 0:
+                grasp_point_location = 'left'
+            else:
+                grasp_point_location = 'right'
+            
+            rospy.logdebug(f'[{self.node_name}] Grasp location is in the {grasp_point_location} side of the image')
+            self.pub_grasp_point_location.publish(grasp_point_location)
 
         # coordinate system of camera: x-forward, y-left, z-up
         _xyz = [xyz[2], -xyz[0], -xyz[1]]

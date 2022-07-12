@@ -9,7 +9,7 @@ from pyquaternion import Quaternion # pip install pyquaternion
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 from geometry_msgs.msg import PoseStamped
-from std_msgs.msg import Float32MultiArray, Float32
+from std_msgs.msg import Float32MultiArray, Float32, String
 
 import tf
 import tf2_ros
@@ -33,9 +33,10 @@ class Planner():
         self.K_ns = 10
 
         self.approach_height = 0.01     # delta_z when approaching the object
-        self.grasp_height = -0.015
+        self.grasp_height = -0.0125
         self.pre_grasp_height = 0.1
         self.current_z = 1000
+        self.grasp_point_location = None
 
         self.current_pos = None
         self.current_ori = None
@@ -58,6 +59,7 @@ class Planner():
         self.panda_pose_sub = rospy.Subscriber("/cartesian_pose", PoseStamped, self.ee_pose_callback)
         self.truss_pose_sub = rospy.Subscriber("/panda/truss_pose", PoseStamped, self.truss_pose_callback)
         self.robot_goal_pose_sub = rospy.Subscriber('/panda_calibration_pose', PoseStamped, self.calibration_pose_callback)
+        self.grasp_location_sub = rospy.Subscriber('/panda/grasp_point_location', String, self.grasp_location_callback)
 
         self.goal_pub = rospy.Publisher('/equilibrium_pose', PoseStamped, queue_size=0)
         self.gripper_pub = rospy.Publisher('/gripper_online', Float32, queue_size=0)
@@ -65,6 +67,9 @@ class Planner():
         
         # z position required to determine the final grasp point
         self.delta_z_pub = rospy.Publisher('/panda/delta_z', Float32, queue_size=0)
+
+        # true when grasping in middle of peduncle, false when grasping at end of peduncle
+        self.com_grasp = rospy.get_param('/panda/com_grasp')
 
     def ee_pose_callback(self, data):
         self.current_pos = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
@@ -77,6 +82,10 @@ class Planner():
     def calibration_pose_callback(self, data):
         self.calibration_pos = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
         self.calibration_ori = np.array([data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z, data.pose.orientation.w])
+
+    def grasp_location_callback(self, data):
+        self.grasp_point_location = data.data
+        rospy.logdebug(f'Grasp point location: {self.grasp_point_location}')
 
     def save_pose(self):
         """
@@ -102,6 +111,10 @@ class Planner():
 
         if movement == 'grasp':
             goals = self.adjust_grasp_movement(goal)
+        elif movement == 'move_place' and not self.com_grasp:
+            goals = self.adjust_move_place_movement(goal)
+        elif movement == 'approach_truss':
+            goals = self.adjust_approach_truss_movement(goal)
         else:
             goals = [goal]
         
@@ -128,7 +141,7 @@ class Planner():
         if movement == 'open':
             goal = 0.02
         elif movement == 'close':
-            goal = 0.009
+            goal = 0.002
 
         # manipulator
         else:
@@ -150,8 +163,11 @@ class Planner():
             elif movement == 'move_saved_pose':
                 goal_pos = self.saved_pos
                 goal_ori = self.saved_ori
+            
+            elif movement == 'pickup':
+                goal_pos, goal_ori = self.find_pickup_pose()
 
-            elif movement == 'approach_truss' or movement == 'approach_grasp_point' or movement == 'pre_grasp' or movement == 'grasp':
+            elif movement == 'approach_truss' or movement == 'approach_truss_2' or movement == 'approach_grasp_point' or movement == 'pre_grasp' or movement == 'grasp':
                 truss_pos = self.truss_pos
                 truss_ori = self.truss_ori
 
@@ -163,6 +179,8 @@ class Planner():
 
                 if movement == 'grasp':
                     pos = self.adjust_grasp_pos(input_pos=pos)
+                    if not self.com_grasp:
+                        ori = self.adjust_grasp_ori(input_ori=ori)
 
                 # transform pose with calibration transform
                 pos, ori = self.transform_pose(input_pos=pos, input_ori=ori, movement=movement)
@@ -171,7 +189,14 @@ class Planner():
                 goal_ori = ori
 
                 if movement == 'approach_truss':
-                    goal_pos[2] = 0.22
+                    goal_pos[2] = 0.17
+
+                    sf = np.sqrt(1/(goal_ori[0]**2 + goal_ori[1]**2))             #create unit length array
+                    goal_ori = np.array([goal_ori[0]*sf, goal_ori[1]*sf, 0, 0])   #ensure the end-effector is vertically oriented
+
+                elif movement == 'approach_truss_2':
+                    goal_pos[2] = 0.17
+                    goal_ori = self.current_ori
 
                     sf = np.sqrt(1/(goal_ori[0]**2 + goal_ori[1]**2))             #create unit length array
                     goal_ori = np.array([goal_ori[0]*sf, goal_ori[1]*sf, 0, 0])   #ensure the end-effector is vertically oriented
@@ -253,10 +278,9 @@ class Planner():
         """
         When grasping, first move to x cm above object and then move down
         """
-        z = 0.03
+        z = 0.02
         step_size = 0.005
         num_steps = int(z/step_size)
-        
         
         goals = []
         for i in range(num_steps):
@@ -277,14 +301,185 @@ class Planner():
 
         return goals
     
+    def adjust_move_place_movement(self, goal):
+        """
+        Placing a truss grasped at the end of the peduncle requires
+        a different placing movement
+        """
+        
+        current_pos = self.current_pos
+        current_ori = self.current_ori
+        
+        goals = []
+
+        # Goal 1
+        _goal1 = PoseStamped()
+        _goal1.pose.position.x = goal.pose.position.x
+        _goal1.pose.position.y = goal.pose.position.y
+        _goal1.pose.position.z = current_pos[2]
+
+        _goal1.pose.orientation.x = current_ori[0]
+        _goal1.pose.orientation.y = current_ori[1]
+        _goal1.pose.orientation.z = current_ori[2]
+        _goal1.pose.orientation.w = current_ori[3]
+
+        # Goal 2
+        _goal2 = PoseStamped()
+        _goal2.pose.position.x = goal.pose.position.x
+        _goal2.pose.position.y = goal.pose.position.y + 0.2
+        _goal2.pose.position.z = goal.pose.position.z
+
+        _goal2.pose.orientation.x = 0.707
+        _goal2.pose.orientation.y = 0.707
+        _goal2.pose.orientation.z = 0
+        _goal2.pose.orientation.w = 0
+
+        # euler_angles = euler_from_quaternion(current_ori, 'sxyz')
+        # # angle (between -135 and -180) or (between 135 and 180 deg)
+        # if euler_angles[1] < 0:
+        #     _goal2.pose.orientation.x = 0.707
+        # else:
+        #     _goal2.pose.orientation.x = -0.707
+        
+        # _goal2.pose.orientation.y = 0.707
+        # _goal2.pose.orientation.z = 0
+        # _goal2.pose.orientation.w = 0
+
+        goals.append(_goal1)
+        goals.append(_goal2)
+
+        return goals
+
+    def adjust_approach_truss_movement(self, goal):
+        """
+        Adjust the movement so the gripper is more horizontal
+        First move x cm above the object
+        Then move down, this ensure a more horizontal orientation of the Panda
+        """
+
+        goals = []
+
+        _goal1 = PoseStamped()
+
+        if goal.pose.orientation.x > 0.6 and goal.pose.orientation.y > 0.6:
+            # gripper faces forward
+            _goal1.pose.position.x = goal.pose.position.x
+            _goal1.pose.position.y = goal.pose.position.y - 0.2
+        else:
+            # gripper faces to the right
+            _goal1.pose.position.x = goal.pose.position.x - 0.2
+            _goal1.pose.position.y = goal.pose.position.y
+
+        _goal1.pose.position.z = goal.pose.position.z + 0.2
+        _goal1.pose.orientation = goal.pose.orientation
+
+        goals.append(_goal1)
+        goals.append(goal)
+
+        return goals
+
     def adjust_grasp_pos(self, input_pos=None):
         """
         Adjust grasp pose because of calibration-gripper offset
+        and because of the gripper orientation differing across the table
         """
 
-        delta_pos = np.array([0.0, -0.02, 0.0])
+        if self.current_ori[0] > 0.6 and self.current_ori[1] > 0.6:
+            # gripper faces forward
+            gripper_orientation = 'forwards'
+            if self.current_pos[1] > 0.48:
+                truss_location = 'front'
+            elif self.current_pos[1] < 0.48 and self.current_pos[1] > 0.38:
+                truss_location = 'middle'
+            elif self.current_pos[1] < 0.38:
+                truss_location = 'back'
+        else:
+            # gripper faces to the right
+            gripper_orientation = 'sideways'
+            if self.current_pos[0] > -0.32:
+                truss_location = 'front'
+            elif self.current_pos[0] < -0.32 and self.current_pos[0] > -0.44:
+                truss_location = 'middle'
+            elif self.current_pos[0] < -0.44:
+                truss_location = 'back'
+
+        rospy.logdebug(f'Gripper orientation: {gripper_orientation}')
+        rospy.logdebug(f'Truss location: {truss_location}')
+
+        # correction for tilting of gripper
+        if truss_location == 'front':
+            if gripper_orientation == 'forwards':
+                delta_pos = np.array([0.0, -0.015, -0.005])
+            else:
+                delta_pos = np.array([0.005, -0.015, -0.005])
+        
+        elif truss_location == 'middle':
+            if gripper_orientation == 'forwards':
+                delta_pos = np.array([0.0, -0.015, -0.005])
+            else:
+                delta_pos = np.array([0.005, -0.013, -0.005])
+        
+        elif truss_location == 'back':
+            if gripper_orientation == 'forwards':
+                delta_pos = np.array([0.0, -0.015, -0.0075])
+            else:
+                delta_pos = np.array([0.0, -0.015, -0.015])
+
         pos = input_pos + delta_pos
         return pos
+
+    def adjust_grasp_ori(self, input_ori=None):
+        """
+        When grasping at the end of peduncle, the gripper orientation
+        must sometimes be flipped in order to not run into joint limits 
+        when picking up the truss 
+        """
+
+        if self.current_ori[0] > 0.6 and self.current_ori[1] > 0.6:
+            gripper_orientation = 'forwards'
+        else:
+            gripper_orientation = 'sideways'
+        
+        rospy.logdebug(f'Gripper orientation: {gripper_orientation}')
+        rospy.logdebug(f'Grasp point location: {self.grasp_point_location}')
+
+        flip = False
+
+        if gripper_orientation == 'sideways':
+            if input_ori[0] > 0 and input_ori[1] > 0:
+                if self.grasp_point_location == 'right':
+                    flip = True
+            if input_ori[0] > 0 and input_ori[1] < 0:
+                if self.grasp_point_location == 'left':
+                    flip = True
+        else:
+            if input_ori[0] > 0.6 and -0.8 < input_ori[1] < 0.8:
+                if self.grasp_point_location == 'right':
+                    flip = True
+            if 0 < input_ori[0] < 0.8 and (input_ori[1] < -0.707 or input_ori[1] > 0.707):
+                if self.grasp_point_location == 'left':
+                    flip = True
+
+        if flip:
+            x = input_ori[0]
+            y = input_ori[1]
+            z = input_ori[2]
+            w = input_ori[3]
+            quat = (x,y,z,w)
+            rospy.logdebug(f'[{self.node_name}] Orientation is flipped 180 degrees because of joint limits')
+            rospy.logdebug(f'Quaternion before flip: {quat}')
+
+            euler_angles = euler_from_quaternion(quat, 'sxyz')
+            
+            # this somehow flips the sign of the angle
+            euler_angles = (euler_angles[0], euler_angles[1], euler_angles[2]+np.pi)
+            quat = quaternion_from_euler(euler_angles[0], euler_angles[1], -euler_angles[2], 'rxyz')
+            ori = np.array(quat)
+            rospy.logdebug(f'Quaternion after flip: {ori}')
+        else:
+            ori = input_ori
+
+        return ori
     
     def transform_pose(self, input_pos=None, input_ori=None, movement=None):
         """
@@ -343,6 +538,42 @@ class Planner():
 
         return pos, ori
 
+    def find_pickup_pose(self):
+        """
+        Finds the pose to pickup the truss when end of peduncle grasping is used
+        """
+
+        
+        # current_ori = self.current_ori
+        # grasp_point_location = self.grasp_point_location
+
+        # if grasp_point_location is None:
+        #     grasp_point_location = 'left'
+        #     rospy.logwarn(f'[{self.node}] Grasp point location is unknown, setting it to {grasp_point_location}')
+
+        current_pos = self.current_pos
+        delta_pos = np.array([0.0, 0.0, 0.3])
+
+        goal_pos = current_pos + delta_pos
+        goal_ori = np.array([-0.5, -0.5, -0.5, 0.5]) 
+
+        # euler_angles = euler_from_quaternion(current_ori, 'sxyz')
+
+        # # angle (between -135 and -180) or (between 135 and 180 deg)
+        # if euler_angles[2] > 2.356 or euler_angles[2] < -2.356:
+        #     if grasp_point_location == 'right':
+        #         goal_ori = np.array([-0.5, -0.5, -0.5, 0.5])
+        #     elif grasp_point_location == 'left':
+        #         goal_ori = np.array([-0.5, 0.5, 0.5, 0.5])
+
+        # else:
+        #     if grasp_point_location == 'right':
+        #         goal_ori = np.array([-0.5, 0.5, 0.5, 0.5])
+        #     elif grasp_point_location == 'left':
+        #         goal_ori = np.array([-0.5, -0.5, -0.5, 0.5])
+        
+        return goal_pos, goal_ori
+
     def check_movement(self, goal_pose):
         """
         Check for collisions with table or end points that are far away
@@ -374,7 +605,6 @@ class Planner():
         w = goal_pose.pose.orientation.w
         quat = (x,y,z,w)
 
-        # quat = np.array(goal_pose.pose.orientation)
         euler_angles = euler_from_quaternion(quat, 'sxyz')
 
         # angle between 0 and -90 deg

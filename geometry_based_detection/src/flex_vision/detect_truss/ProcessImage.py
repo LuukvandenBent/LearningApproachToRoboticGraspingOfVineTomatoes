@@ -29,6 +29,7 @@ from flex_vision.utils.util import make_dirs, load_rgb, save_img, save_fig, figu
 from flex_vision.utils.util import stack_segments, change_brightness
 from flex_vision.utils.util import plot_timer, plot_grasp_location, plot_image, plot_features, plot_segments
 from flex_vision.utils.util import save_images, find_grasp_coords_and_angles, find_grasp_point_end_peduncle, find_grasp_point_com
+from flex_vision.utils.util import find_grasp_point_middle_image
 from flex_vision.utils.util import find_mean_of_array, find_px_per_mm
 from flex_vision.utils.util import create_bboxed_images, widen_bboxes
 
@@ -52,7 +53,8 @@ class ProcessImage(object):
                  com_grasp=True,
                  pwd='',
                  name='tomato',
-                 ext='pdf'
+                 ext='pdf',
+                 command=None
                  ):
 
         self.ext = ext
@@ -61,6 +63,7 @@ class ProcessImage(object):
         self.pwd = pwd
         self.name = name
         self.com_grasp = com_grasp
+        self.command = command
 
         self.scale = None
         self.img_rgb = None
@@ -450,9 +453,13 @@ class ProcessImage(object):
                 _ = self.get_peduncle()
                 mid_point = self.peduncle_mid_point.get_coord(self.LOCAL_FRAME_ID)
             grasp_pixel, angle = find_grasp_point_com(grasp_coords, angles, mid_point)
+        
         else:
-            peduncle_xy = coords_from_points(self.peduncle_points, self.LOCAL_FRAME_ID)
-            grasp_pixel, angle = find_grasp_point_end_peduncle(grasp_coords, angles, self.peduncle_crop)
+            if self.command == 'detect_grasp_point_2' or self.command == 'detect_grasp_point_close':
+                grasp_pixel, angle = find_grasp_point_middle_image(grasp_coords, angles, self.shape, self.bbox)
+            else:
+                peduncle_xy = coords_from_points(self.peduncle_points, self.LOCAL_FRAME_ID)
+                grasp_pixel, angle = find_grasp_point_end_peduncle(grasp_coords, angles, self.peduncle_crop)
 
         grasp_angle_local = angle
         grasp_angle_global = -self.angle + grasp_angle_local

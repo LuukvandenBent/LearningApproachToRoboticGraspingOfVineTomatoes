@@ -60,14 +60,14 @@ class RqtFlexGrasp(Plugin):
         self._widget.OpenButton.clicked[bool].connect(lambda: self.pub_command.publish("open"))
         self._widget.CloseButton.clicked[bool].connect(lambda: self.pub_command.publish("close"))
         self._widget.CalibrateButton.clicked[bool].connect(lambda: self.pub_command.publish("calibrate"))
-        self._widget.CalibrateHeightButton.clicked[bool].connect(lambda: self.pub_command.publish("calibrate_height"))
 
         self._widget.DetectTrussButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_truss"))
         self._widget.DetectGraspPointButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_grasp_point"))
         self._widget.DetectGraspPointCloseButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_grasp_point_close"))
+        self._widget.DetectGraspPoint2Button.clicked[bool].connect(lambda: self.pub_command.publish("detect_grasp_point_2"))
         self._widget.DetectGraspPointNNButton.clicked[bool].connect(lambda: self.pub_command.publish("detect_grasp_point_NN"))
 
-        self._widget.PickButton.clicked[bool].connect(lambda: self.pub_command.publish("pick"))
+        self._widget.PickupButton.clicked[bool].connect(lambda: self.pub_command.publish("pickup"))
         self._widget.MovePlaceButton.clicked[bool].connect(lambda: self.pub_command.publish("move_place"))
 
         self._widget.ApproachGraspPointButton.clicked[bool].connect(lambda: self.pub_command.publish("approach_grasp_point"))

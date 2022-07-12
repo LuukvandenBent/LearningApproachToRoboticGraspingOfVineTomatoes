@@ -1086,6 +1086,32 @@ def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop):
 
     return grasp_pixel, angle
 
+def find_grasp_point_middle_image(grasp_coords, angles, shape, bbox):
+    """
+    Find grasp point closest to the middle of the image
+    """
+
+    mid_point_x = shape[0]/2
+    mid_point_y = shape[1]/2
+
+    distance_min = np.Inf
+
+    for i in range(len(grasp_coords)):
+        grasp_coord = grasp_coords[i]
+
+        grasp_coord_global = [grasp_coord[0] + bbox[0], grasp_coord[1] + bbox[1]]
+
+        distance_to_midpoint = np.sqrt((grasp_coord_global[0] - mid_point_x)**2 + (grasp_coord_global[1] - mid_point_y)**2)
+
+        if distance_to_midpoint < distance_min:
+                distance_min = distance_to_midpoint
+                index = i
+        
+    grasp_pixel = [np.around(grasp_coords[index]).astype(int)]
+    angle = angles[index]
+
+    return grasp_pixel, angle
+
 def find_mean_of_array(array):
 
     size = (array.shape[0]*array.shape[1])

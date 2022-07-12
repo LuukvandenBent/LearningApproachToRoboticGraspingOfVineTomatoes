@@ -179,9 +179,9 @@
    </item>
 
    <item row="1" column="2">
-    <widget class="QPushButton" name="PickButton">
+    <widget class="QPushButton" name="PickupButton">
      <property name="text">
-      <string>Pick</string>
+      <string>Pickup</string>
      </property>
     </widget>
    </item>
@@ -211,9 +211,9 @@
    </item>
 
    <item row="5" column="2">
-    <widget class="QPushButton" name="CalibrateHeightButton">
+    <widget class="QPushButton" name="DetectGraspPoint2Button">
      <property name="text">
-      <string>Calibrate Height</string>
+      <string>Detect Grasp Point 2</string>
      </property>
     </widget>
    </item>

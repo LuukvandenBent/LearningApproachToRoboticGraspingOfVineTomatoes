@@ -21,6 +21,8 @@ class PlannerStateMachine(object):
                                 'move_upwards', 'move_downwards',
                                 'move_calibrate',
                                 'move_home',
+                                'return_home',
+                                'move_up',
                                 'move_saved_pose',
                                 'move_place',
                                 'pickup',

@@ -130,6 +130,10 @@ def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=Non
     else:
         start_nodes = end_nodes
 
+    best_path = None
+    best_length = 0
+    best_branch_data = None
+
     for start_node in start_nodes:
 
         if do_animate:
@@ -185,6 +189,7 @@ def find_path(dist, pred, junc_nodes, end_nodes, pixel_coordinates, bg_image=Non
                         diff = abs(angle_total - angle_new)
 
                     if diff < 45 or len(subpath) < min(bg_image.shape[:2])/50:
+                    # if diff < 70:
                         angle_total = node_coord_angle(init_coord, new_coord)  # angle_new
                         path.extend(subpath)
                         branch_data.append(subpath)

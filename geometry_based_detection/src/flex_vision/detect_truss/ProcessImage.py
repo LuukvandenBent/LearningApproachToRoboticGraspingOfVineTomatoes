@@ -441,7 +441,7 @@ class ProcessImage(object):
                 for j in range(len(area_y)):
                     grasp_img[area_x[i]][area_y[j]] = 0
         
-        grasp_coords, angles = find_grasp_coords_and_angles(grasp_img)
+        grasp_coords, angles, grasp_area_lengths = find_grasp_coords_and_angles(grasp_img)
 
         if self.com_grasp:
             # when close_to_COM true, grasp point closest to COM is chosen, else grasp point closest to peduncle mid_point
@@ -459,7 +459,7 @@ class ProcessImage(object):
                 grasp_pixel, angle = find_grasp_point_middle_image(grasp_coords, angles, self.shape, self.bbox)
             else:
                 peduncle_xy = coords_from_points(self.peduncle_points, self.LOCAL_FRAME_ID)
-                grasp_pixel, angle = find_grasp_point_end_peduncle(grasp_coords, angles, self.peduncle_crop)
+                grasp_pixel, angle = find_grasp_point_end_peduncle(grasp_coords, angles, self.peduncle_crop, grasp_area_lengths)
 
         grasp_angle_local = angle
         grasp_angle_global = -self.angle + grasp_angle_local

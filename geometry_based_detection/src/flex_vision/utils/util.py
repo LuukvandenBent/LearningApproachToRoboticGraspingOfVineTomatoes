@@ -989,6 +989,7 @@ def find_grasp_coords_and_angles(grasp_img):
     subpath = [mask[0]]
     grasp_coords = []
     angles = []
+    grasp_area_lengths = []
     for i in range(len(mask)-1):
         current_coord = mask[i]
         next_coord = mask[i+1]
@@ -997,19 +998,25 @@ def find_grasp_coords_and_angles(grasp_img):
         if dist < 10:
             subpath.append(next_coord)
         else:
+            if len(subpath) < 10:
+                continue
             grasp_coord, angle = calculate_grasp_point_and_angle(subpath)
+            grasp_area_len = len(subpath)
             
             grasp_coords.append(grasp_coord)
             angles.append(angle)
+            grasp_area_lengths.append(grasp_area_len)
             
             subpath = [next_coord]
     
     grasp_coord, angle = calculate_grasp_point_and_angle(subpath)
+    grasp_area_len = len(subpath)
     
     grasp_coords.append(grasp_coord)
     angles.append(angle)
+    grasp_area_lengths.append(grasp_area_len)
 
-    return grasp_coords, angles
+    return grasp_coords, angles, grasp_area_lengths
 
 def find_grasp_point_com(grasp_coords, angles, mid_point):
     """Find grasp point closest to COM"""
@@ -1028,8 +1035,13 @@ def find_grasp_point_com(grasp_coords, angles, mid_point):
 
     return grasp_pixel, angle
 
-def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop):
+def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop, grasp_area_lengths):
     """Find grasp point and the end of the peduncle"""
+
+    # choose the parameter that decides the grasp point
+    peduncle_width = False
+    grasp_area_len = True
+    peduncle_com = False
 
     __, peduncle_crop_bw = cv2.threshold(peduncle_crop, 127, 255, cv2.THRESH_BINARY)
     
@@ -1059,27 +1071,60 @@ def find_grasp_point_end_peduncle(grasp_coords, angles, peduncle_crop):
     extremes = [extreme_1, extreme_2]
     _angles = [angles[index_1], angles[index_2]]
 
-    # find width of peduncle at the extremes
-    widths = [0,0]
-    for i in range(len(extremes)):
-        extreme = extremes[i]
-        angle = _angles[i]
-        width = 0
-        for j in range(1,50):
-            coord_x = int(np.around(extreme[1] + np.cos(angle)*j))
-            coord_y = int(np.around(extreme[0] + np.sin(angle)*j))
-            coord = [coord_x, coord_y]
-            if coord in peduncle_coords:
-                width += 1
-            else:
-                widths[i] = width
-                break
-    
-    # grasp points at largest width is grasp point
-    if widths[0] > widths[1]:
-        index = index_1
-    else:
-        index = index_2
+    if peduncle_width:
+        # find width of peduncle at the extremes
+        widths = [0,0]
+        for i in range(len(extremes)):
+            extreme = extremes[i]
+            angle = _angles[i]
+            width = 0
+            for j in range(1,50):
+                coord_x = int(np.around(extreme[1] + np.cos(angle)*j))
+                coord_y = int(np.around(extreme[0] + np.sin(angle)*j))
+                coord = [coord_x, coord_y]
+                if coord in peduncle_coords:
+                    width += 1
+                else:
+                    widths[i] = width
+                    break
+        
+        # grasp point at largest width is grasp point
+        if widths[0] > widths[1]:
+            index = index_1
+        else:
+            index = index_2
+
+    elif grasp_area_len:
+        # find extreme where grasp_area_length is the largest
+        if grasp_area_lengths[index_1] > grasp_area_lengths[index_2]:
+            index = index_1
+        else:
+            index = index_2
+
+    elif peduncle_com:
+        # find the extreme that is the furthest away from the peduncle center of mass
+        sum_x = 0
+        sum_y = 0
+
+        for i in range(len(peduncle_coords)):
+            sum_x += peduncle_coords[i][0]
+            sum_y += peduncle_coords[i][1]
+        
+        avg_x = sum_x / len(peduncle_coords)
+        avg_y = sum_y / len(peduncle_coords)
+
+        print(f'Extreme 0: {extremes[0]}')
+        print(f'Extreme 1: {extremes[1]}')
+        print(f'Peduncle avg: {[avg_x, avg_y]}')
+
+        dist_0 = np.sqrt((extremes[0][0] - avg_x)**2 + (extremes[0][1] - avg_y)**2)
+        dist_1 = np.sqrt((extremes[1][0] - avg_x)**2 + (extremes[1][1] - avg_y)**2)
+
+        # grasp point that has the largest distance
+        if dist_0 > dist_1:
+            index = index_1
+        else:
+            index = index_2
 
     grasp_pixel = [np.around(grasp_coords[index]).astype(int)]
     angle = angles[index]

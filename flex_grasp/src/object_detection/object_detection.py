@@ -74,7 +74,7 @@ class ObjectDetection(object):
 
         # params
         self.patch_size = 5
-        self.peduncle_height = 0.04  # [m]
+        self.peduncle_height = 0.037  # [m]
         self.settings = settings_lib_to_msg(self.process_image.get_settings())
 
         self.experiment_info = ExperimentInfo(self.node_name)
@@ -429,7 +429,7 @@ class ObjectDetection(object):
                 if depth_measured != depth_measured:        #check if nan
                     rospy.logwarn(f'[{self.node_name}] Depth could not be measured')
                     input('DO YOU WANT STILL WANT TO CONTINUE? (PRESS ENTER)')
-                    depth = 0.245
+                    depth = depth_assumption
                 else:
                     depth = depth_measured
                 

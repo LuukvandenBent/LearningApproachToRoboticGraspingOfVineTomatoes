@@ -119,6 +119,8 @@ class Idle(smach.State):
                                 'move_saved_pose',
                                 'move_place',
                                 'move_home',
+                                'return_home',
+                                'move_up',
                                 'pickup',
                                 'open', 'close']
         self.experiment = False
@@ -172,21 +174,14 @@ class Idle(smach.State):
                     rospy.loginfo('Continuing experiment')
                     userdata.command = 'detect_grasp_point'
                 elif userdata.prev_command == 'detect_grasp_point':
-                #     userdata.command = 'pre_grasp'
-                # elif userdata.prev_command == 'pre_grasp':
-                #     # wait for vibrations to stop
-                #     rospy.sleep(2.0)
-                #     rospy.loginfo('Continuing experiment')
-                #     userdata.command = 'detect_grasp_point_close'
-                # elif userdata.prev_command == 'detect_grasp_point_close':
                     userdata.command = 'grasp'
                 elif userdata.prev_command == 'grasp':
                     userdata.command = 'close'
                 elif userdata.prev_command == 'close':
                     # wait for gripper to close
                     rospy.sleep(1.0)
-                    userdata.command = 'move_home'
-                elif userdata.prev_command == 'move_home':
+                    userdata.command = 'move_up'
+                elif userdata.prev_command == 'move_up':
                     userdata.command = 'move_place'
                 elif userdata.prev_command == 'move_place':
                     userdata.command = 'open'
@@ -194,67 +189,13 @@ class Idle(smach.State):
                 elif userdata.prev_command == 'open' and self.count_open == 3:
                     # wait for gripper to open
                     rospy.sleep(1.0)
-                    userdata.command = 'move_home'
+                    userdata.command = 'return_home'
                     userdata.mode = 'free'
                     self.experiment = False
                     self.count_open = 0
                 else:
                     rospy.logwarn("[{0}] do not know what to do with previous command {1}".format(NODE_NAME, userdata.prev_command))
         
-            # if not self.com_grasp:
-            #     if userdata.prev_command is None or userdata.prev_command == 'reset' or userdata.prev_command == 'spawn_truss' or userdata.prev_command == 'set_pose_truss':
-            #         userdata.command = 'calibrate'
-            #     elif userdata.prev_command == 'calibrate':
-            #         userdata.command = 'open'
-            #         self.count_open += 1
-            #     elif userdata.prev_command == 'open' and self.count_open == 1:
-            #         userdata.command = 'detect_truss'
-            #     elif userdata.prev_command == 'detect_truss':
-            #         userdata.command = 'approach_truss'
-            #         self.count_approach += 1
-            #     elif userdata.prev_command == 'approach_truss'and self.count_approach == 1:
-            #         userdata.command = 'open'
-            #         self.count_open += 1
-            #     elif userdata.prev_command == 'open' and self.count_open == 2:
-            #         # wait for vibrations to stop
-            #         rospy.sleep(2.0)
-            #         rospy.loginfo('Continuing experiment')
-            #         userdata.command = 'detect_grasp_point'
-            #     elif userdata.prev_command == 'detect_grasp_point' and self.count_detect_grasp_point == 1:
-            #         userdata.command = 'approach_truss'
-            #         self.count_approach += 1
-            #     elif userdata.prev_command == 'approach_truss'and self.count_approach == 2:
-            #         # wait for vibrations to stop
-            #         rospy.sleep(2.0)
-            #         rospy.loginfo('Continuing experiment')
-            #         userdata.command = 'detect_grasp_point_close'
-            #         self.count_detect_grasp_point_close += 1
-            #     elif userdata.prev_command == 'detect_grasp_point_close' and self.count_detect_grasp_point_close == 2:
-            #         userdata.command = 'pre_grasp'
-            #     elif userdata.prev_command == 'pre_grasp':
-            #         # wait for vibrations to stop
-            #         rospy.sleep(2.0)
-            #         rospy.loginfo('Continuing experiment')
-            #         userdata.command = 'detect_grasp_point_close'
-            #     elif userdata.prev_command == 'detect_grasp_point_close':
-            #         userdata.command = 'grasp'
-            #     elif userdata.prev_command == 'grasp':
-            #         userdata.command = 'close'
-            #     elif userdata.prev_command == 'close':
-            #         userdata.command = 'pickup'
-            #     elif userdata.prev_command == 'pickup':
-            #         userdata.command = 'move_place'
-            #     elif userdata.prev_command == 'move_place':
-            #         userdata.command = 'open'
-            #         self.count_open += 1
-            #     elif userdata.prev_command == 'open' and self.count_open == 3:
-            #         userdata.command = 'move_home'
-            #         userdata.mode = 'free'
-            #         self.experiment = False
-            #         self.count_open = 0
-            #     else:
-            #         rospy.logwarn("[{0}] do not know what to do with previous command {1}".format(NODE_NAME, userdata.prev_command))
-
             if not self.com_grasp:
                 if userdata.prev_command is None or userdata.prev_command == 'reset' or userdata.prev_command == 'spawn_truss' or userdata.prev_command == 'set_pose_truss':
                     userdata.command = 'calibrate'
@@ -268,23 +209,9 @@ class Idle(smach.State):
                     userdata.command = 'open'
                 elif self.step == 5:
                     # wait for vibrations to stop
-                    rospy.sleep(2.0)
+                    rospy.sleep(4.0)
                     rospy.loginfo('Continuing experiment')
                     userdata.command = 'detect_grasp_point'
-                # elif self.step == 6:
-                #     userdata.command = 'approach_truss_2'
-                # elif self.step == 7:
-                #     # wait for vibrations to stop
-                #     rospy.sleep(2.0)
-                #     rospy.loginfo('Continuing experiment')
-                #     userdata.command = 'detect_grasp_point_2'
-                # elif self.step == 8:
-                #     userdata.command = 'pre_grasp'
-                # elif self.step == 9:
-                #     # wait for vibrations to stop
-                #     rospy.sleep(2.0)
-                #     rospy.loginfo('Continuing experiment')
-                #     userdata.command = 'detect_grasp_point_close'
                 elif self.step == 6:
                     userdata.command = 'grasp'
                 elif self.step == 7:
@@ -300,7 +227,7 @@ class Idle(smach.State):
                 elif self.step == 11:
                     # wait for gripper to open
                     rospy.sleep(1.0)
-                    userdata.command = 'move_home'
+                    userdata.command = 'return_home'
                     userdata.mode = 'free'
                     self.experiment = False
                 else:

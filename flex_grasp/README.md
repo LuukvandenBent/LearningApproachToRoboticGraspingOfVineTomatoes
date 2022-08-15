@@ -126,6 +126,9 @@ Note: this also launches the RealSense launch files
 
 Note: if you get warnings that the end effector is not able to reach its targets upon closing you may consider redefining the Closed interbotix_gripper group state as stated in `/interbotix_ros_arms/interbotix_moveit/config/srdf/px150.srdf.xacro`.
 
+4. An rqt graphical user interface should pop up, sometimes in initializes incorrect, if this happens hit Ctrl + C, and retry
+    <img src="doc/rqt.png" alt="rqt" width="800"/>
+
 ### Calibrate
 First we need to calibrate the robot, this will generate a yaml file, which is stored and can be reused. Simply press `calibrate` in the GUI. The manipulator should move to several poses successively. It should print something as follows in the terminal:
 

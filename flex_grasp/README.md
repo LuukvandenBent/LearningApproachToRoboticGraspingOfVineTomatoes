@@ -27,35 +27,11 @@ catkin_make
 clone this repository
 ```
 cd ~/flexcraft_ws/src
-git clone https://github.com/padmaja-kulkarni/taeke_msc.git
+git clone https://github.com/JensZuurbier/vine_tomato_grasping.git
 ```
 
 ### 1.4 Basic Dependencies
 Some more packages need to be installed manually.
-
-#### Interbotix Support
-For Interbotix support we require interbotix_ros_arms:
-```
-cd ~/flexcraft_ws/src
-git clone --single-branch --branch reboot_service https://github.com/TaekedeHaan/interbotix_ros_arms.git
-```
-This forked repository has an additional reboot service which is automatically called when a motor reports an Harware Error. Note that the used repository is now in legacy mode, the [updated SDK](https://github.com/Interbotix/interbotix_ros_core) contains this reboot serive by default. However, I never tested the rest of the code with the update SDK. We need to install one dependency manually:
-```
-python -m pip install modern_robotics
-```
-Finally set up the udev rules for communication:
-```
-$ sudo cp ~/flexcraft_ws/src/interbotix_ros_arms/interbotix_sdk/10-interbotix-udev.rules /etc/udev/rules.d
-$ sudo udevadm control --reload-rules && udevadm trigger
-```
-When running into any problems please refere to the [interbotix_ros_arms repo](https://github.com/Interbotix/interbotix_ros_arms)
-
-#### iiwa Support
-For iiwa support we require the iiwa_stack:
-```
-cd ~/flexcraft_ws/src
-git clone https://github.com/IFL-CAMP/iiwa_stack
-```
 
 #### Calibration
 For calibration easy_handeye is used and aruco_ros is needed:
@@ -90,24 +66,11 @@ Launch RealSense
 roslaunch realsense2_camera rs_rgbd.launch align_depth:=true depth_width:=1280 depth_height:=720 depth_fps:=30 color_width:=1280 color_height:=720 color_fps:=30
 ```
 
-#### Graphical User Interface
-For fine-tuning parameters of the computer vision pipeline rqt_ez_publisher is used:
-```
-cd ~/flexcraft_ws/src
-git clone --single-branch --branch initialize-subscribe https://github.com/TaekedeHaan/rqt_ez_publisher.git
-```
-This forks contains some modifications to initialize the parameters in the GUI to the values last published. Note that you can also use the default library. However, this initialization makes life a bit easier.
-
 #### Python packages
 Not all packages could be specified in the package.xml, and need to be installled manually:
 ```
-python2 -m pip install colormath
+pip install colormath
 ```
-The flex_vision package relies on a fork of the skan library wich offers python 2 support:
-```
-python2 -m pip install git+https://github.com/TaekedeHaan/skan.git@python-2.7
-```
-
 
 ### 1.5 Remaining Dependencies
 Install remaining dependencies:
@@ -116,30 +79,52 @@ cd ~/flexcraft_ws
 rosdep install --from-paths src --ignore-src -r -y
 ```
 
-## 2 Run (Simulation)
-1. To run in simulation we first launch the enviroment. To launch the interbotix enviroment run in your terminal:
+## 2 Working with Panda Franka Emika
+
+### How to start the impedance controller
+```
+roslaunch franka_human_friendly_controllers cartesian_variable_impedance_controller.launch robot_ip:=<robot_ip> load_gripper:=True
+```
+For example, <robot_ip>=172.16.0.2
+
+### How to read the current position and orientation of the end-effector?
+```
+rostopic echo /cartesian_pose
+```
+
+### How to connect your PC to the network and read and send commands to the controller.
+
+1. Connect your PC to the network
+2. Create a new wired network and in IPv4 set Manual and put a new ip for your computer <pc_ip>=A.B.C.F where F is different from the <computer_ip> or the <robot_ip>. Netmask is the same 255.255.255.0. Save the network. 
+3. Add this to your bash file (gedit ~/.bashrc): 
+```
+export ROS_MASTER_URI=http://<computer_ip>:11311 
+export ROS_IP=<pc_ip> 
+export ROS_HOSTNAME=<pc_ip>
+```
+(this can give issues when launching the camera for example, an alternative is to do these exports only in the needed terminal windows)
+
+4. source /opt/ros/<ros_version>/setup.bash
+5. Test the data_streaming with rostopic list
+
+### How to control the gripper
+```
+rosrun franka_human_friendly_controllers franka_gripper_online
+```
+To change the width of the gripper you can publish rostopic pub /gripper_online msgs/Float32 "data: 0.01"
+in the data you can specify your desired gripper width in meters.
+
+## 3 Run Own Software
+1. First launch the Panda launch files (see previouse chapter). To launch the environment and controls for real hardware run in your terminal:
     ```
-    roslaunch flex_grasp interbotix_enviroment.launch use_calibration:=false
+    roslaunch flex_grasp detection_and_planning.launch
     ```
-    There is no calibration file available yet, therefore we put `use_calibration` to `false`.
+Note: this also launches the RealSense launch files
+2. An rqt graphical user interface should pop up, sometimes in initializes incorrect, if this happens hit Ctrl + C, and retry
 
-2. Gazebo should start by default it is paused (this behaviour can be chnaged in the launch files).
+3. You have successfully initialized the controls, and the robot is ready to go.
 
-    <img src="doc/gazebo.png" alt="Gazebo" width="800"/>
-
-3. Unpause the simulation by hitting play on the bar shown at the bottom, RViz should start
-
-    <img src="doc/rviz.png" alt="RViz" width="800"/>
-
-4. You have succesfully started the enviroment. To stat the controls run in your terminal:
-    ```
-    roslaunch flex_grasp interbotix_control.launch
-    ```
-5. An rqt graphical user interface should pop up, sometimes in initializes incorrect, if this happens hit Ctrl + C, and retry
-
-    <img src="doc/rqt.png" alt="rqt" width="800"/>
-
-6. You have succesfully initialized the controls, and the virtual robot is ready to go.
+Note: if you get warnings that the end effector is not able to reach its targets upon closing you may consider redefining the Closed interbotix_gripper group state as stated in `/interbotix_ros_arms/interbotix_moveit/config/srdf/px150.srdf.xacro`.
 
 ### Calibrate
 First we need to calibrate the robot, this will generate a yaml file, which is stored and can be reused. Simply press `calibrate` in the GUI. The manipulator should move to several poses successively. It should print something as follows in the terminal:
@@ -170,104 +155,54 @@ roslaunch flex_grasp interbotix_enviroment.launch
 ```
 And the previously generated calibration file will be loaded automatically.
 
-### Run (Real Hardware)
-1. Again, first launch the environment. To launch the interbotix environment for real hardware run in your terminal:
-    ```
-    roslaunch flex_grasp interbotix_enviroment.launch camera_sim:=false robot_sim:=false
-    ```
-    Here we use the parameters to toggle between Gazebo simulation and real hardware:
-    - camera_sim: simulate the camera (default: true)
-    - robot_sim: simulate the manipulator (default: true)
-
-2. You have successfully started the environment. To stat the controls run in your terminal:
-    ```
-    roslaunch flex_grasp interbotix_control.launch
-    ```
-3. An rqt graphical user interface should pop up, sometimes in initializes incorrect, if this happens hit Ctrl + C, and retry
-
-4. You have successfully initialized the controls, and the robot is ready to go.
-
-Note: if you get warnings that the end effector is not able to reach its targets upon closing you may consider redefining the Closed interbotix_gripper group state as stated in `/interbotix_ros_arms/interbotix_moveit/config/srdf/px150.srdf.xacro`. I am using values of 0.017 and -0.017 due to the additional finger tips.
-
 ### Command (Virtual) Robot
 To activate an action, a command needs to be published on the `ROBOT_NAME/pipeline_command`. This can be done using the GUI:
-- Sleep: command the manipulator to the resting pose
-- Home: command the manipulator to the upright pose
-- Ready: command the robot to the initial pose
+- Home: command the robot to the initial pose
+- Move Right: command the robot to move ..cm to the right
+- Move Left: command the robot to move ..cm to the left
+- Move Forwards: command the robot to move ..cm forwards
+- Move Backwards: command the robot to move ..cm backward
+- Move Upwards: command the robot to move ..cm upward
+- Move Downwards: command the robot to move ..cm downward
+- Approach truss: command the robot to approach the truss detected by truss detection model
+- Grasp: command to the robot to perform grasp with determined grasp point
+- Place: command to the robot to place object at target location
 - Open: command the end effector to open
 - Close: command the end effector to close
+
+- Detect Truss: command to truss detection model to detect the tomato trusses
+- Detect Grasp Point: command to determine grasp point on a tomato truss
+
+- Save Pose: command to the robot to save the current pose
+- Go to Saved Pose: command to the robot to move to the saved pose
+
 - Calibrate: determine the pose between the robot base and camera
-- Detect Truss: command to computer vision pipeline to detect the truss
-- Save Image: save the current image
-- Pick and Place: execute a pick and place routing
-- Experiment: Repeatedly execute Detect Truss, Save Image and Pick and Place (easy for conducitng experiments)
-
-With the drop down menu you can select where to store the results.
-
-
-## 3 Working with Panda Franka Emika
-
-### How to start the impedance controller
-roslaunch franka_human_friendly_controllers cartesian_variable_impedance_controller.launch robot_ip:=<robot_ip> load_gripper:=True
-
-For example, <robot_ip>=172.16.0.2
-
-### How to read the current position and orientation of the end-effector?
-rostopic echo /cartesian_pose
-
-### How to connect your PC to the network and read and send commands to the controller.
-
-1. Connect your PC to the network
-2. Create a new wired network and in IPv4 set Manual and put a new ip for your computer <pc_ip>=A.B.C.F where F is different from the <computer_ip> or the <robot_ip>. Netmask is the same 255.255.255.0. Save the network. 
-3. Add this to your bash file (gedit ~/.bashrc): 
-```
-export ROS_MASTER_URI=http://<computer_ip>:11311 
-export ROS_IP=<pc_ip> 
-export ROS_HOSTNAME=<pc_ip>
-```
-(this can give issues when launching the camera for example, an alternative is to do these exports only in the needed terminal windows)
-
-4. source /opt/ros/<ros_version>/setup.bash
-5. Test the data_streaming with rostopic list
-
-### How to control the gripper
-```
-rosrun franka_human_friendly_controllers franka_gripper_online
-```
-To change the width of the gripper you can publish rostopic pub /gripper_online msgs/Float32 "data: 0.01"
-in the data you can specify your desired gripper width in meters.
-
+- Experiment: Repeatedly execute Detect Truss, Approach Truss, Detect Grasp Point, Grasp, Place, Home (easy for conducting experiments)
 
 ## 4 Supported hardware
 
 Manipulator:
 
-- **Interbotix PincherX 150** (possibly all others from the interbotix series, but this has not been tested)
-- **KUKA LBR IIWA 7** (deprecated in simulation + not tested on actual hardware)
-
-End-effector:
-
-- **SDH** (deprecated in simulation + not tested on actual hardware)
+- **Franka Emika Panda manipulator**
 
 Carmera:
 
 - **Intel RealSense D435**
 
-
 ## 5 Contents
 
 ### Nodes
 
-- `analyze_point_cloud`: not used
+#### Custom software
 - `calibrate`: generates the calibration poses, sends them to the move robot node and computing calibration
-- `monitor robot`: is used to monitor the DYNAMIXELS of the interbotix robot, by reading temperature and error values. Furthermore it sets the PID values upon startup as defined in `/config/px150_pid`. This node does not do anything in simulation
-- `move_gripper`: not used
 - `move_robot`: takes commands from other nodes and moves the manipulater according to these commands
-- `object_detection`: uses detect_truss to identify a valid grasp location
-- `pick_place`: generates pick place commands and sends these to move_robot
+- `plan_movement`: takes commands from other nodes to plan a movement for the robot, publishes to a topic the robot reads from and moves to
+- `object_detection`: identifies the tomato trusses and determines a valid grasp location
 - `pipeline`: contains the statemachine, commands all other nodes
-- `transform_pose`: transforms a grasping pose as calculated by object_detection to a target pose for the manipulator
-- `visualize_object`: not used
+- `my_rqt_dashboard`: dashboard to press buttons to move the robot, detect grasp point etc.
+
+#### RealSense
+- `realsense2_camera`: publishes RGB and Depth data to topics
 
 ### Classes
 - `communication`: this class is used by many nodes to send commands to other nodes and wait for the result
@@ -277,7 +212,6 @@ Carmera:
 - `Peduncle`
 - `Tomato`
 - `Truss`
-
 
 ### Enums
 To store the state of different parts of the system, enums are used. These are defined in the messa files.

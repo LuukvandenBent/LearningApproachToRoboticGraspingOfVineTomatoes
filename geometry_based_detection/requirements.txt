@@ -4,9 +4,7 @@ pandas
 sklearn
 numpy
 matplotlib
-# opencv-python==4.2.0.32
 opencv-python
 scipy
 colormath
 skan
-# git+https://github.com/TaekedeHaan/skan.git@python-2.7

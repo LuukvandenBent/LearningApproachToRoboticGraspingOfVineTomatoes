@@ -102,6 +102,11 @@ export ROS_MASTER_URI=http://<computer_ip>:11311
 export ROS_IP=<pc_ip> 
 export ROS_HOSTNAME=<pc_ip>
 ```
+```
+export ROS_MASTER_URI=http://172.16.0.1:11311 
+export ROS_IP=172.16.0.30 
+export ROS_HOSTNAME=172.16.0.30
+```
 (this can give issues when launching the camera for example, an alternative is to do these exports only in the needed terminal windows)
 
 4. source /opt/ros/<ros_version>/setup.bash
